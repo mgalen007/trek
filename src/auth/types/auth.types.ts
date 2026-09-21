@@ -1,5 +1,4 @@
-
 export interface AuthenticatedUser {
-  userId: string
-  email: string
+  userId: string;
+  email: string;
 }

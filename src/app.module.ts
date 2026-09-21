@@ -7,7 +7,7 @@ import { ItinerariesModule } from './itineraries/itineraries.module';
 import { HotelsModule } from './hotels/hotels.module';
 import { AirportsModule } from './airports/airports.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config'
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 
 @Module({
@@ -19,7 +19,7 @@ import { AuthModule } from './auth/auth.module';
     HotelsModule,
     AirportsModule,
     PrismaModule,
-    AuthModule
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
