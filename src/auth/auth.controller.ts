@@ -13,16 +13,21 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() dto: LoginDto) {
-    const user = await this.authService.validateUser(dto.email, dto.password);
-    if (!user) throw new UnauthorizedException();
+    const token = await this.authService.login(dto.email, dto.password);
 
-    return user;
+    return {
+      message: 'Login successful',
+      data: { token }
+    }
   }
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {
     const user = await this.usersService.create(dto);
 
-    return user;
+    return {
+      message: 'User registered successfully',
+      data: { user }
+    }
   }
 }

@@ -25,6 +25,8 @@ model User {
   updatedAt DateTime @updatedAt
 
   itineraries Itinerary[]
+
+  @@map("users")
 }
 
 model Destination {
@@ -41,6 +43,8 @@ model Destination {
   hotels Hotel[]
   airports Airport[]
   itineraries Itinerary[]
+
+  @@map("destinations")
 }
 
 model Hotel {
@@ -57,6 +61,8 @@ model Hotel {
 
   destination Destination @relation(fields: [destinationId], references: [id])
   itineraryHotels ItineraryHotel[]
+
+  @@map("hotels")
 }
 
 model Airport {
@@ -70,6 +76,8 @@ model Airport {
   destination Destination @relation(fields: [destinationId], references: [id])
   departingFlights Flight[] @relation("DepartingFlights")
   arrivingFlights Flight[] @relation("ArrivingFlights")
+
+  @@map("airports")
 }
 
 model Flight {
@@ -89,6 +97,8 @@ model Flight {
   departureAirport Airport @relation("DepartingFlights", fields: [departureAirportId], references: [id])
   arrivalAirport Airport @relation("ArrivingFlights", fields: [arrivalAirportId], references: [id])
   itineraryFlight ItineraryFlight[]
+
+  @@map("flights")
 }
 
 model Itinerary {
@@ -106,6 +116,8 @@ model Itinerary {
   destination Destination @relation(fields: [destinationId], references: [id])
   itineraryHotel ItineraryHotel[]
   itineraryFlight ItineraryFlight[]
+
+  @@map("itineraries")
 }
 
 model ItineraryHotel {
@@ -120,6 +132,8 @@ model ItineraryHotel {
 
   itinerary Itinerary @relation(fields: [itineraryId], references: [id])
   hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@map("itinerary_hotel")
 }
 
 model ItineraryFlight {
@@ -130,4 +144,6 @@ model ItineraryFlight {
 
   itinerary Itinerary @relation(fields: [itineraryId], references: [id])
   flight Flight @relation(fields: [flightId], references: [id])
+
+  @@map("itinerary_flight")
 }

@@ -13,9 +13,10 @@ export class UsersService {
 
   async create(dto: RegisterDto) {
     const password = dto.password;
+    const saltRounds = Number(this.configService.getOrThrow<number>('BCRYPT_SALT_ROUNDS'))
     const hash = await bcrypt.hash(
       password,
-      this.configService.getOrThrow<number>('BCRYPT_SALT_ROUNDS'),
+      saltRounds,
     );
 
     const user = await this.prisma.user.create({
