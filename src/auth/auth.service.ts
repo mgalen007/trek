@@ -14,10 +14,10 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException();
+    if (!user) throw new UnauthorizedException('Invalid email or password');
 
     const matches = await bcrypt.compare(password, user.passwordHash)
-    if (!matches) throw new UnauthorizedException()
+    if (!matches) throw new UnauthorizedException('Invalid email or password')
 
     const { email: userEmail, id, role } = user
     const token = this.jwtService.sign(
@@ -26,5 +26,15 @@ export class AuthService {
     )
 
     return token
+  }
+
+  async getProfile(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } })
+    if (!user) throw new UnauthorizedException()
+
+    // eslint-disable-next-line
+    const { passwordHash, ...safeUser } = user
+
+    return safeUser
   }
 }
