@@ -6,7 +6,7 @@ import { JwtModule, type JwtSignOptions } from '@nestjs/jwt';
 import { UsersModule } from '../users/users.module'
 import { PrismaModule } from '../prisma/prisma.module';
 import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from './jwt.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [

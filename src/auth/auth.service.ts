@@ -19,9 +19,9 @@ export class AuthService {
     const matches = await bcrypt.compare(password, user.passwordHash)
     if (!matches) throw new UnauthorizedException()
 
-    const { email: userEmail, firstName, lastName } = user
+    const { email: userEmail, id, role } = user
     const token = this.jwtService.sign(
-      { userEmail, firstName, lastName },
+      { sub: id, email: userEmail, role },
       { secret: this.configService.getOrThrow<string>('JWT_SECRET') }
     )
 
