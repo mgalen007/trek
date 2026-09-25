@@ -17,8 +17,9 @@ export class SeedService implements OnApplicationBootstrap {
       where: { role: 'ADMIN' },
     });
 
-    if (adminCount > 1) {
-      return this.logger.log('Database already has an admin. Skipping seed');
+    if (adminCount >= 1) {
+      this.logger.log('Database already has an admin. Skipping seed');
+      return
     }
 
     try {
@@ -35,7 +36,7 @@ export class SeedService implements OnApplicationBootstrap {
         this.configService.getOrThrow<string>('SEED_ADMIN_EMAIL');
       const seedAdminHash = await bcrypt.hash(
         seedAdminPassword,
-        this.configService.getOrThrow<number>('BCRYPT_SALT_ROUNDS'),
+        Number(this.configService.getOrThrow<number>('BCRYPT_SALT_ROUNDS')),
       );
 
       await this.prisma.user.create({

@@ -28,8 +28,8 @@ export class UsersController {
     return user;
   }
 
-  @Roles(Role.ADMIN)
   @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
   @Get()
   async getAllUsers() {
     const users = await this.usersService.getUsers();
