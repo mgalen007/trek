@@ -4,8 +4,8 @@ export interface AuthenticatedUser {
 }
 
 export enum Role {
-  ADMIN = "admin",
-  USER = "user"
+  ADMIN = 'admin',
+  USER = 'user',
 }
 
-export const ROLES_KEY = 'roles'
+export const ROLES_KEY = 'roles';

@@ -1,10 +1,19 @@
-import { Controller, Post, Get, HttpCode, HttpStatus, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard'
-import type { AuthenticatedRequest } from './types/req.types'
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import type { AuthenticatedRequest } from './types/req.types';
 
 @Controller('auth')
 export class AuthController {
@@ -20,8 +29,8 @@ export class AuthController {
 
     return {
       message: 'Login successful',
-      data: { token }
-    }
+      data: { token },
+    };
   }
 
   @Post('register')
@@ -30,15 +39,15 @@ export class AuthController {
 
     return {
       message: 'User registered successfully',
-      data: { user }
-    }
+      data: { user },
+    };
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@Request() req: AuthenticatedRequest) {
-    const profile = await this.authService.getProfile(req.user.id)
+    const profile = await this.authService.getProfile(req.user.id);
 
-    return profile
+    return profile;
   }
 }
