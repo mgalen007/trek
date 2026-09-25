@@ -10,9 +10,6 @@ import type { ICurrentUser } from '../auth/types/user.types';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Role } from '../auth/types/auth.types';
 import * as bcrypt from 'bcryptjs';
-import { identity } from 'rxjs';
-import { IsEmail } from 'class-validator';
-import { createDeflate } from 'node:zlib';
 
 @Injectable()
 export class UsersService {
@@ -57,7 +54,7 @@ export class UsersService {
   }
 
   async update(id: string, currentUser: ICurrentUser, newUser: UpdateUserDto) {
-    if (currentUser.id !== id) throw new UnauthorizedException();
+    if ((currentUser.id !== id) && (currentUser.role !== Role.ADMIN)) throw new UnauthorizedException();
 
     const user = await this.prisma.user.update({
       where: { id },
