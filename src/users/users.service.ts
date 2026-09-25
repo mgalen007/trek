@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from '../auth/dto/register.dto';
+import type { ICurrentUser } from '../auth/types/user.types'
+import { Role } from '../auth/types/auth.types'
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -33,7 +35,10 @@ export class UsersService {
     return safeUser;
   }
 
-  async remove(id: string) {
+  async remove(id: string, currentUser: ICurrentUser) {
+    if (!(currentUser.role === Role.ADMIN) && (currentUser.id !== id)) {
+      throw new UnauthorizedException()
+    }
     const user = await this.prisma.user.delete({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 

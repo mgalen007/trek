@@ -7,3 +7,5 @@ export interface IUser {
   firstName: string
   lastName: string
 }
+
+export type ICurrentUser = Pick<IUser, "id" | "role" | "email">
