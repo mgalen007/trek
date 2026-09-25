@@ -54,7 +54,8 @@ export class UsersService {
   }
 
   async update(id: string, currentUser: ICurrentUser, newUser: UpdateUserDto) {
-    if ((currentUser.id !== id) && (currentUser.role !== Role.ADMIN)) throw new UnauthorizedException();
+    if (currentUser.id !== id && currentUser.role !== Role.ADMIN)
+      throw new UnauthorizedException();
 
     const user = await this.prisma.user.update({
       where: { id },
