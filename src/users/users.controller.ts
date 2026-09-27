@@ -23,7 +23,7 @@ export class UsersController {
 
   @Get(':id')
   async findById(@Param('id') id: string) {
-    const user = await this.usersService.getUserById(id);
+    const user = await this.usersService.findOneById(id);
 
     return user;
   }
@@ -32,7 +32,7 @@ export class UsersController {
   @Roles(Role.ADMIN)
   @Get()
   async getAllUsers() {
-    const users = await this.usersService.getUsers();
+    const users = await this.usersService.findAll();
 
     return users;
   }

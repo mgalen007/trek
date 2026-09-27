@@ -65,7 +65,7 @@ export class UsersService {
     return user;
   }
 
-  async getUsers() {
+  async findAll() {
     const users = await this.prisma.user.findMany({
       select: {
         id: true,
@@ -81,7 +81,7 @@ export class UsersService {
     return users;
   }
 
-  async getUserById(id: string) {
+  async findOneById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       omit: { passwordHash: true },
