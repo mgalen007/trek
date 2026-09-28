@@ -1,6 +1,7 @@
 
 export const paginationMetadata = (skip: number, limit: number) => {
-  return { skip, limit }
+  const page = (skip / 15) + 1
+  return { page, skip, limit }
 }
 
 export const getPaginationParams = (page?: number, limit?: number) => {
