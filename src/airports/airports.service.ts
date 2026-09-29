@@ -1,52 +1,54 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateAirportDto } from './dto/create-airport.dto';
 import { PaginationQueryParams } from 'common/types/pagination.types';
-import { getPaginationParams, paginationMetadata } from 'common/helpers/pagination.helpers';
+import {
+  getPaginationParams,
+  paginationMetadata,
+} from 'common/helpers/pagination.helpers';
 import { UpdateAirportDto } from './dto/update-airport.dto';
-
 
 @Injectable()
 export class AirportsService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateAirportDto) {
-    const airport = await this.prisma.airport.create({ data: dto })
+    const airport = await this.prisma.airport.create({ data: dto });
 
-    return airport    
+    return airport;
   }
 
   async findOneById(id: string) {
-    const airport = await this.prisma.airport.findUnique({ where: { id } })
-    if (!airport) throw new NotFoundException('Airport not found')
+    const airport = await this.prisma.airport.findUnique({ where: { id } });
+    if (!airport) throw new NotFoundException('Airport not found');
 
-    return airport
+    return airport;
   }
 
   async findAll(options: PaginationQueryParams) {
-    const { skip, l: limit } = getPaginationParams(options.page, options.limit)
+    const { skip, l: limit } = getPaginationParams(options.page, options.limit);
     const airports = await this.prisma.airport.findMany({
       take: limit,
-      skip
-    })
+      skip,
+    });
 
-    return { airports, pagination: paginationMetadata(skip, limit) }
+    return { airports, pagination: paginationMetadata(skip, limit) };
   }
 
   async update(id: string, dto: UpdateAirportDto) {
     const airport = await this.prisma.airport.update({
       where: { id },
-      data: dto
-    })
-    if (!airport) throw new NotFoundException('Airport not found')
+      data: dto,
+    });
+    if (!airport) throw new NotFoundException('Airport not found');
 
-    return airport
+    return airport;
   }
 
   async remove(id: string) {
-    const airport = await this.prisma.airport.delete({ where: { id } })
-    if (!airport) throw new NotFoundException('Airport not found')
+    const airport = await this.prisma.airport.delete({ where: { id } });
+    if (!airport) throw new NotFoundException('Airport not found');
 
-    return airport
+    return airport;
   }
 }

@@ -1,18 +1,18 @@
-import { IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator'
+import { IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
 
 export class UpdateAirportDto {
   @IsOptional()
   @IsString()
   @MinLength(32)
-  destinationId: string
+  destinationId: string;
 
   @IsOptional()
   @IsString()
   @MinLength(3)
-  code: string
+  code: string;
 
   @IsOptional()
   @IsString()
   @MinLength(5)
-  name: string
+  name: string;
 }

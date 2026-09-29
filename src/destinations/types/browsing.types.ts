@@ -1,15 +1,15 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator'
+import { IsString, IsNumber, IsOptional } from 'class-validator';
 
 export class BrowsingQueryParams {
   @IsOptional()
   @IsString()
-  name?: string
-  
-  @IsOptional()
-  @IsNumber()
-  page?: number
+  name?: string;
 
   @IsOptional()
   @IsNumber()
-  limit?: number
+  page?: number;
+
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
 }

@@ -1,27 +1,27 @@
-import { IsString, MinLength, IsNumber, IsOptional } from 'class-validator'
+import { IsString, MinLength, IsNumber, IsOptional } from 'class-validator';
 
 export class CreateDestinationDto {
   @IsString()
   @MinLength(3)
-  name: string
+  name: string;
 
   @IsString()
-  city: string
+  city: string;
 
   @IsString()
   @MinLength(4)
-  country: string
+  country: string;
 
   @IsString()
   @IsOptional()
   @MinLength(8)
-  description?: string
+  description?: string;
 
   @IsNumber()
   @IsOptional()
-  latitude?: number
+  latitude?: number;
 
   @IsNumber()
   @IsOptional()
-  longitude?: number
+  longitude?: number;
 }

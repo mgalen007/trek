@@ -1,30 +1,30 @@
-import { IsString, MinLength, IsNumber, IsOptional } from 'class-validator'
+import { IsString, MinLength, IsNumber, IsOptional } from 'class-validator';
 
 export class UpdateDestinationDto {
   @IsString()
   @IsOptional()
   @MinLength(3)
-  name?: string
+  name?: string;
 
   @IsString()
   @IsOptional()
-  city?: string
+  city?: string;
 
   @IsString()
   @IsOptional()
   @MinLength(4)
-  country?: string
+  country?: string;
 
   @IsString()
   @IsOptional()
   @MinLength(8)
-  description?: string
+  description?: string;
 
   @IsNumber()
   @IsOptional()
-  latitude?: number
+  latitude?: number;
 
   @IsNumber()
   @IsOptional()
-  longitude?: number
+  longitude?: number;
 }
