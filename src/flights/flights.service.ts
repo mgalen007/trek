@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { UpdateFlightDto } from './dto/update-flight.dto';
 import { CreateFlightDto } from './dto/create-flight.dto';
 import { PaginationQueryParams } from 'common/types/pagination.types';
-import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { getPaginationParams, paginationMetadata } from 'common/helpers/pagination.helpers';
 
 
 @Injectable()
@@ -30,7 +30,7 @@ export class FlightsService {
       skip
     })
 
-    return flights
+    return { flights, pagination: paginationMetadata(skip, limit) }
   }
 
   async update(id: string, dto: UpdateFlightDto) {
