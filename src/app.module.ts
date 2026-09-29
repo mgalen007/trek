@@ -10,6 +10,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { SeedService } from './scripts/seed';
+import { AiportsController } from './aiports/aiports.controller';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { SeedService } from './scripts/seed';
     PrismaModule,
     AuthModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AiportsController],
   providers: [AppService, SeedService],
 })
 export class AppModule {}
