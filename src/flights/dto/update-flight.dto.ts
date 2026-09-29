@@ -1,6 +1,6 @@
 import { IsString, MinLength, IsNumber, IsDate, Min, IsOptional } from 'class-validator'
 
-export class CreateFlightDto {
+export class UpdateFlightDto {
   @IsOptional()
   @IsString()
   @MinLength(32)
