@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateAirportDto } from './dto/create-airport.dto';
 import { PaginationQueryParams } from 'common/types/pagination.types';
-import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { getPaginationParams, paginationMetadata } from 'common/helpers/pagination.helpers';
 import { UpdateAirportDto } from './dto/update-airport.dto';
 
 
@@ -23,13 +23,6 @@ export class AirportsService {
     return airport
   }
 
-  async findOneByCode(code: string) {
-    const airport = await this.prisma.airport.findUnique({ where: { code } })
-    if (!airport) throw new NotFoundException('Airport not found')
-
-    return airport
-  }
-
   async findAll(options: PaginationQueryParams) {
     const { skip, l: limit } = getPaginationParams(options.page, options.limit)
     const airports = await this.prisma.airport.findMany({
@@ -37,7 +30,7 @@ export class AirportsService {
       skip
     })
 
-    return airports
+    return { airports, pagination: paginationMetadata(skip, limit) }
   }
 
   async update(id: string, dto: UpdateAirportDto) {
