@@ -19,7 +19,7 @@ export class SeedService implements OnApplicationBootstrap {
 
     if (adminCount >= 1) {
       this.logger.log('Database already has an admin. Skipping seed');
-      return
+      return;
     }
 
     try {

@@ -1,4 +1,4 @@
-import type { Role } from '../types/auth.types'
+import type { Role } from '../types/auth.types';
 
 export interface JwtPayload {
   sub: string;

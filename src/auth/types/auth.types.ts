@@ -1,8 +1,7 @@
-
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  role: Role
+  role: Role;
 }
 
 export enum Role {

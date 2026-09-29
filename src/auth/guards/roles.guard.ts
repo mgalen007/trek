@@ -9,7 +9,7 @@ export class RolesGuard implements CanActivate {
 
   canActivate(ctx: ExecutionContext) {
     const req: AuthenticatedRequest = ctx.switchToHttp().getRequest();
-    
+
     const requiredRoles: Role[] = this.reflector.get(
       ROLES_KEY,
       ctx.getHandler(),
