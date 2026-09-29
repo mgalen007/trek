@@ -15,14 +15,4 @@ export class UpdateAirportDto {
   @IsString()
   @MinLength(5)
   name: string
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  city: string
-
-  @IsOptional()
-  @IsString()
-  @MinLength(4)
-  country: string
 }

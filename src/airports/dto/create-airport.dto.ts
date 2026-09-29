@@ -12,12 +12,4 @@ export class CreateAirportDto {
   @IsString()
   @MinLength(5)
   name: string
-
-  @IsString()
-  @IsNotEmpty()
-  city: string
-
-  @IsString()
-  @MinLength(4)
-  country: string
 }
