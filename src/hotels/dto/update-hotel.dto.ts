@@ -1,6 +1,6 @@
 import { IsString, Length, IsInt, IsNumber, Min, IsOptional } from 'class-validator'
 
-export class CreateHotelDto {
+export class UpdateHotelDto {
   @IsOptional()
   @IsString()
   destinationId?: string
