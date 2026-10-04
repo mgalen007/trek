@@ -37,12 +37,14 @@ export class HotelsService {
       where: { id },
       data: dto
     })
+    if (!hotel) throw new NotFoundException('Hotel not found')
 
     return hotel
   }
 
   async remove(id: string) {
     const hotel = await this.prisma.hotel.delete({ where: { id } })
+    if (!hotel) throw new NotFoundException('Hotel not found')
 
     return hotel
   }
