@@ -40,7 +40,7 @@ export class FlightsController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @Put(':id')
-  async update(@Param('id') id: string, dto: UpdateFlightDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdateFlightDto) {
     const flight = await this.flightService.update(id, dto)
 
     return flight

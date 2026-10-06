@@ -48,7 +48,6 @@ export class UsersService {
       where: { id },
       omit: { passwordHash: true },
     });
-    if (!user) throw new NotFoundException('User not found');
 
     return user;
   }

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsOptional, Min } from 'class-validator';
 
 export class BrowsingQueryParams {
   @IsOptional()
@@ -6,10 +6,12 @@ export class BrowsingQueryParams {
   name?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   page?: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   limit?: number;
 }
