@@ -1,9 +1,8 @@
-import { IsString, MinLength, IsOptional } from 'class-validator';
+import { IsString, IsUUID, MinLength, IsOptional } from 'class-validator';
 
 export class UpdateAirportDto {
   @IsOptional()
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   destinationId?: string;
 
   @IsOptional()

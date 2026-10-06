@@ -1,7 +1,7 @@
 import {
   Injectable,
   NotFoundException,
-  UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
@@ -42,7 +42,7 @@ export class UsersService {
 
   async remove(id: string, currentUser: ICurrentUser) {
     if (!(currentUser.role === Role.ADMIN) && currentUser.id !== id) {
-      throw new UnauthorizedException();
+      throw new ForbiddenException();
     }
     const user = await this.prisma.user.delete({
       where: { id },
@@ -54,7 +54,7 @@ export class UsersService {
 
   async update(id: string, currentUser: ICurrentUser, newUser: UpdateUserDto) {
     if (currentUser.id !== id && currentUser.role !== Role.ADMIN)
-      throw new UnauthorizedException();
+      throw new ForbiddenException();
 
     const user = await this.prisma.user.update({
       where: { id },

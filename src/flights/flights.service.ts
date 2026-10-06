@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service'
 import { UpdateFlightDto } from './dto/update-flight.dto';
 import { CreateFlightDto } from './dto/create-flight.dto';
@@ -10,7 +10,15 @@ import { getPaginationParams, paginationMetadata } from 'common/helpers/paginati
 export class FlightsService {
   constructor(private prisma: PrismaService) { }
 
+  private validateRoute(flight: Pick<CreateFlightDto, 'departureAirportId' | 'arrivalAirportId' | 'departureAt' | 'arrivalAt'>) {
+    if (flight.departureAirportId === flight.arrivalAirportId)
+      throw new BadRequestException('Departure and arrival airports must differ')
+    if (new Date(flight.arrivalAt) <= new Date(flight.departureAt))
+      throw new BadRequestException('arrivalAt must be after departureAt')
+  }
+
   async create(dto: CreateFlightDto) {
+    this.validateRoute(dto)
     const flight = await this.prisma.flight.create({ data: dto })
 
     return flight
@@ -34,6 +42,14 @@ export class FlightsService {
   }
 
   async update(id: string, dto: UpdateFlightDto) {
+    const existing = await this.findOneById(id)
+    this.validateRoute({
+      departureAirportId: dto.departureAirportId ?? existing.departureAirportId,
+      arrivalAirportId: dto.arrivalAirportId ?? existing.arrivalAirportId,
+      departureAt: dto.departureAt ?? existing.departureAt,
+      arrivalAt: dto.arrivalAt ?? existing.arrivalAt,
+    })
+
     const flight = await this.prisma.flight.update({
       where: { id },
       data: dto

@@ -1,12 +1,10 @@
-import { IsString, MinLength, IsNumber, IsDate, Min } from 'class-validator'
+import { IsString, IsUUID, IsInt, MinLength, IsNumber, IsDate, Min } from 'class-validator'
 
 export class CreateFlightDto {
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   departureAirportId: string
 
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   arrivalAirportId: string
 
   @IsString()
@@ -31,7 +29,7 @@ export class CreateFlightDto {
   @MinLength(3)
   currency: string
  
-  @IsNumber()
-  @Min(6)
+  @IsInt()
+  @Min(0)
   availableSeats: number
 }

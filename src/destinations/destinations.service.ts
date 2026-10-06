@@ -31,7 +31,7 @@ export class DestinationsService {
   async findByName(name: string, options: PaginationQueryParams) {
     const { skip, l: limit } = getPaginationParams(options.page, options.limit);
     const destinations = await this.prisma.destination.findMany({
-      where: { name },
+      where: { name: { contains: name, mode: 'insensitive' } },
       take: limit,
       skip,
     });
