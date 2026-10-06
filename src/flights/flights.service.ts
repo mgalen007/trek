@@ -38,14 +38,12 @@ export class FlightsService {
       where: { id },
       data: dto
     })
-    if (!flight) throw new NotFoundException('Flight not found')
 
     return flight
   }
 
   async remove(id: string) {
     const flight = await this.prisma.flight.delete({ where: { id } })
-    if (!flight) throw new NotFoundException('Flight not found')
 
     return flight
   }

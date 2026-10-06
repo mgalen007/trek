@@ -40,14 +40,12 @@ export class AirportsService {
       where: { id },
       data: dto,
     });
-    if (!airport) throw new NotFoundException('Airport not found');
 
     return airport;
   }
 
   async remove(id: string) {
     const airport = await this.prisma.airport.delete({ where: { id } });
-    if (!airport) throw new NotFoundException('Airport not found');
 
     return airport;
   }

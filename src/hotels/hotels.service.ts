@@ -3,7 +3,7 @@ import { CreateHotelDto } from './dto/create-hotel.dto'
 import { UpdateHotelDto } from './dto/update-hotel.dto'
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaginationQueryParams } from 'common/types/pagination.types';
-import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { getPaginationParams, paginationMetadata } from 'common/helpers/pagination.helpers';
 
 @Injectable()
 export class HotelsService {
@@ -29,7 +29,7 @@ export class HotelsService {
       skip
     })
 
-    return hotels
+    return { hotels, pagination: paginationMetadata(skip, limit) }
   }
 
   async update(id: string, dto: UpdateHotelDto) {
@@ -37,14 +37,12 @@ export class HotelsService {
       where: { id },
       data: dto
     })
-    if (!hotel) throw new NotFoundException('Hotel not found')
 
     return hotel
   }
 
   async remove(id: string) {
     const hotel = await this.prisma.hotel.delete({ where: { id } })
-    if (!hotel) throw new NotFoundException('Hotel not found')
 
     return hotel
   }

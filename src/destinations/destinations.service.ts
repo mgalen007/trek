@@ -53,14 +53,12 @@ export class DestinationsService {
       where: { id },
       data: dto,
     });
-    if (!destination) throw new NotFoundException('Destination not found');
 
     return destination;
   }
 
   async remove(id: string) {
     const destination = await this.prisma.destination.delete({ where: { id } });
-    if (!destination) throw new NotFoundException('Destination not found');
 
     return destination;
   }
