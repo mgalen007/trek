@@ -1,7 +1,7 @@
 {
   // Jest runs CommonJS, but @nestjs/config, /jwt and /passport v12 ship as ESM,
   // so tests compile everything (including those packages) to CommonJS.
-  "extends": "../tsconfig.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node10",
