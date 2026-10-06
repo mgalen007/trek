@@ -15,6 +15,12 @@ enum ItineraryStatus {
   CANCELLED
 }
 
+enum BookingStatus {
+  HELD
+  CONFIRMED
+  CANCELLED
+}
+
 enum Role {
   ADMIN
   USER
@@ -61,7 +67,7 @@ model Hotel {
   rating Decimal?
   nightlyRate Decimal
   currency String
-  availableRooms Int
+  totalRooms Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -114,7 +120,7 @@ model Itinerary {
   name String
   startDate DateTime
   endDate DateTime
-  status ItineraryStatus
+  status ItineraryStatus @default(DRAFT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -123,6 +129,7 @@ model Itinerary {
   itineraryHotel ItineraryHotel[]
   itineraryFlight ItineraryFlight[]
 
+  @@index([userId])
   @@map("itineraries")
 }
 
@@ -133,12 +140,17 @@ model ItineraryHotel {
   checkInDate DateTime
   checkOutDate DateTime
   rooms Int
+  status BookingStatus @default(HELD)
+  nightlyRate Decimal
+  totalPrice Decimal
+  currency String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  itinerary Itinerary @relation(fields: [itineraryId], references: [id])
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   hotel Hotel @relation(fields: [hotelId], references: [id])
 
+  @@index([hotelId, checkInDate, checkOutDate])
   @@map("itinerary_hotel")
 }
 
@@ -146,9 +158,15 @@ model ItineraryFlight {
   id String @id @default(uuid())
   itineraryId String
   flightId String
+  passengers Int
+  status BookingStatus @default(HELD)
+  unitPrice Decimal
+  totalPrice Decimal
+  currency String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  itinerary Itinerary @relation(fields: [itineraryId], references: [id])
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   flight Flight @relation(fields: [flightId], references: [id])
 
   @@map("itinerary_flight")

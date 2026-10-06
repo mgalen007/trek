@@ -1,7 +1,7 @@
-import { IsString, Length, IsInt, IsNumber, Min, IsOptional } from 'class-validator'
+import { IsString, IsUUID, Length, IsInt, IsNumber, Min, IsOptional } from 'class-validator'
 
 export class CreateHotelDto {
-  @IsString()
+  @IsUUID()
   destinationId: string
 
   @IsString()
@@ -23,5 +23,5 @@ export class CreateHotelDto {
 
   @IsInt()
   @Min(1)
-  availableRooms: number
+  totalRooms: number
 }
