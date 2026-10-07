@@ -30,6 +30,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 @ApiTags('Destinations')
 @ApiBearerAuth()
@@ -106,6 +107,7 @@ export class DestinationsController {
 
   @AdminOnly()
   @Post()
+  @Idempotent()
   @ApiOperation({ summary: 'Create a destination (admin)' })
   @ApiDataResponse(DestinationEntity, { status: HttpStatus.CREATED })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST])

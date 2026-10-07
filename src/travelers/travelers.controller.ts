@@ -21,6 +21,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 import { TravelersService } from './travelers.service';
 import { CreateTravelerDto } from './dto/create-traveler.dto';
 import { UpdateTravelerDto } from './dto/update-traveler.dto';
@@ -35,6 +36,7 @@ export class TravelersController {
   constructor(private travelersService: TravelersService) {}
 
   @Post()
+  @Idempotent()
   @ApiOperation({
     summary: 'Add a traveler',
     description:

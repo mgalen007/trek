@@ -13,6 +13,7 @@ import { SeedService } from './scripts/seed';
 import { FlightsModule } from './flights/flights.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { TravelersModule } from './travelers/travelers.module';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TravelersModule } from './travelers/travelers.module';
     FlightsModule,
     PreferencesModule,
     TravelersModule,
+    IdempotencyModule,
   ],
   controllers: [AppController],
   providers: [AppService, SeedService],

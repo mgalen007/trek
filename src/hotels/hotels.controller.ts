@@ -23,6 +23,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 @ApiTags('Hotels')
 @ApiBearerAuth()
@@ -34,6 +35,7 @@ export class HotelsController {
 
   @AdminOnly()
   @Post()
+  @Idempotent()
   @ApiOperation({ summary: 'Create a hotel (admin)' })
   @ApiDataResponse(HotelEntity, { status: HttpStatus.CREATED })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST])

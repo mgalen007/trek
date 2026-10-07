@@ -23,6 +23,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 @ApiTags('Airports')
 @ApiBearerAuth()
@@ -34,6 +35,7 @@ export class AirportsController {
 
   @AdminOnly()
   @Post()
+  @Idempotent()
   @ApiOperation({ summary: 'Create an airport (admin)' })
   @ApiDataResponse(AirportEntity, { status: HttpStatus.CREATED })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.CONFLICT], {

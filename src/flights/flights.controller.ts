@@ -26,6 +26,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 @ApiTags('Flights')
 @ApiBearerAuth()
@@ -37,6 +38,7 @@ export class FlightsController {
 
   @AdminOnly()
   @Post()
+  @Idempotent()
   @ApiOperation({ summary: 'Create a flight (admin)' })
   @ApiDataResponse(FlightEntity, { status: HttpStatus.CREATED })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST])
