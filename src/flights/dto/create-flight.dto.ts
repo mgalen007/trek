@@ -1,35 +1,43 @@
-import { IsString, IsUUID, IsInt, MinLength, IsNumber, IsDate, Min } from 'class-validator'
+import {
+  IsString,
+  IsUUID,
+  IsInt,
+  MinLength,
+  IsNumber,
+  IsDate,
+  Min,
+} from 'class-validator';
 
 export class CreateFlightDto {
   @IsUUID()
-  departureAirportId: string
+  departureAirportId: string;
 
   @IsUUID()
-  arrivalAirportId: string
+  arrivalAirportId: string;
 
   @IsString()
   @MinLength(3)
-  airline: string
- 
+  airline: string;
+
   @IsString()
-  @MinLength(3) 
-  flightNumber: string
- 
+  @MinLength(3)
+  flightNumber: string;
+
   @IsDate()
-  departureAt: Date
- 
+  departureAt: Date;
+
   @IsDate()
-  arrivalAt: Date
+  arrivalAt: Date;
 
   @IsNumber()
   @Min(0)
-  price: number
- 
+  price: number;
+
   @IsString()
   @MinLength(3)
-  currency: string
- 
+  currency: string;
+
   @IsInt()
   @Min(0)
-  availableSeats: number
+  availableSeats: number;
 }

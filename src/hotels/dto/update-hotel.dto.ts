@@ -1,33 +1,41 @@
-import { IsString, IsUUID, Length, IsInt, IsNumber, Min, IsOptional } from 'class-validator'
+import {
+  IsString,
+  IsUUID,
+  Length,
+  IsInt,
+  IsNumber,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class UpdateHotelDto {
   @IsOptional()
   @IsUUID()
-  destinationId?: string
+  destinationId?: string;
 
   @IsOptional()
   @IsString()
-  name?: string
+  name?: string;
 
   @IsOptional()
   @IsString()
-  address?: string
+  address?: string;
 
   @IsOptional()
   @IsNumber()
-  rating?: number
+  rating?: number;
 
   @IsOptional()
   @IsNumber()
-  nightlyRate?: number
+  nightlyRate?: number;
 
   @IsOptional()
   @IsString()
   @Length(3, 3)
-  currency?: string
+  currency?: string;
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  totalRooms?: number
+  totalRooms?: number;
 }
