@@ -3,10 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAirportDto } from './dto/create-airport.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { AirportQueryParams } from './types/airport-query.types';
-import {
-  getPaginationParams,
-  paginationMetadata,
-} from 'common/helpers/pagination.helpers';
+import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { toPage } from 'common/http/page';
 import { UpdateAirportDto } from './dto/update-airport.dto';
 
 @Injectable()
@@ -44,7 +42,7 @@ export class AirportsService {
       this.prisma.airport.count({ where }),
     ]);
 
-    return { airports, pagination: paginationMetadata(skip, limit, total) };
+    return toPage(airports, skip, limit, total);
   }
 
   async update(id: string, dto: UpdateAirportDto) {

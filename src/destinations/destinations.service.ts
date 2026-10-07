@@ -3,10 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateDestinationDto } from './dto/create-destination.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { BrowsingQueryParams } from './types/browsing.types';
-import {
-  getPaginationParams,
-  paginationMetadata,
-} from 'common/helpers/pagination.helpers';
+import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { toPage } from 'common/http/page';
 import { UpdateDestinationDto } from './dto/update-destination.dto';
 
 @Injectable()
@@ -49,10 +47,7 @@ export class DestinationsService {
       this.prisma.destination.count({ where }),
     ]);
 
-    return {
-      destinations,
-      pagination: paginationMetadata(skip, limit, total),
-    };
+    return toPage(destinations, skip, limit, total);
   }
 
   async findOneById(id: string) {

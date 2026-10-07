@@ -27,20 +27,14 @@ export class AuthController {
   async login(@Body() dto: LoginDto) {
     const token = await this.authService.login(dto.email, dto.password);
 
-    return {
-      message: 'Login successful',
-      data: { token },
-    };
+    return { token };
   }
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {
     const user = await this.usersService.create(dto);
 
-    return {
-      message: 'User registered successfully',
-      data: { user },
-    };
+    return user;
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,13 +1,35 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  INestApplication,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { PrismaExceptionFilter } from '../common/filters/prisma-exception.filter';
+import { ApiExceptionFilter } from '../common/filters/api-exception.filter';
+import { EnvelopeInterceptor } from '../common/http/envelope.interceptor';
+import { apiError, ErrorCode } from '../common/http/api-error';
+
+// Flattens nested class-validator errors into [{ field, errors }], with
+// dotted paths for nested fields (e.g. "address.city").
+const toFieldErrors = (
+  errors: ValidationError[],
+  parent?: string,
+): { field: string; errors: string[] }[] =>
+  errors.flatMap((e) => {
+    const field = parent ? `${parent}.${e.property}` : e.property;
+    const own = e.constraints
+      ? [{ field, errors: Object.values(e.constraints) }]
+      : [];
+    return [...own, ...toFieldErrors(e.children ?? [], field)];
+  });
 
 // Shared by main.ts and the e2e tests so both run the same pipeline.
 export function configureApp(app: INestApplication) {
   app.setGlobalPrefix('api');
 
   const { httpAdapter } = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new PrismaExceptionFilter(httpAdapter));
+  app.useGlobalFilters(new ApiExceptionFilter(httpAdapter));
+  app.useGlobalInterceptors(new EnvelopeInterceptor());
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -17,6 +39,14 @@ export function configureApp(app: INestApplication) {
       transformOptions: {
         enableImplicitConversion: true,
       },
+      exceptionFactory: (errors) =>
+        new BadRequestException(
+          apiError(
+            ErrorCode.VALIDATION_FAILED,
+            'Request validation failed',
+            toFieldErrors(errors),
+          ),
+        ),
     }),
   );
 }
