@@ -1,0 +1,10 @@
+{
+  // e2e tests run the @nestjs/swagger CLI plugin (test/swagger-plugin.transformer.js)
+  // so the served OpenAPI document matches `nest build`. The plugin needs the
+  // type checker, which isolatedModules turns off. Unit tests keep the faster
+  // isolated mode in tsconfig.jest.json.
+  "extends": "./tsconfig.jest.json",
+  "compilerOptions": {
+    "isolatedModules": false
+  }
+}
