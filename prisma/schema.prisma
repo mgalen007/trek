@@ -37,8 +37,47 @@ model User {
   updatedAt DateTime @updatedAt
 
   itineraries Itinerary[]
+  preferences UserPreferences?
+  travelers Traveler[]
 
   @@map("users")
+}
+
+// Defaults the platform (and later the AI agent) uses when planning for a user.
+model UserPreferences {
+  userId String @id
+  homeAirportId String?
+  currency String?
+  maxNightlyRate Decimal?
+  minHotelRating Decimal?
+  defaultTravelers Int @default(1)
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeAirport Airport? @relation(fields: [homeAirportId], references: [id], onDelete: SetNull)
+
+  @@map("user_preferences")
+}
+
+// A person a user books travel for (themselves, family, colleagues).
+// Deliberately no passport data until real airline integrations need it.
+model Traveler {
+  id String @id @default(uuid())
+  userId String
+  firstName String
+  lastName String
+  dateOfBirth DateTime @db.Date
+  nationality String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flightBookings ItineraryFlight[] @relation("FlightBookingTravelers")
+
+  @@index([userId])
+  @@map("travelers")
 }
 
 model Destination {
@@ -89,6 +128,7 @@ model Airport {
   destination Destination @relation(fields: [destinationId], references: [id])
   departingFlights Flight[] @relation("DepartingFlights")
   arrivingFlights Flight[] @relation("ArrivingFlights")
+  homeAirportFor UserPreferences[]
 
   @@index([destinationId])
   @@map("airports")
@@ -173,6 +213,7 @@ model ItineraryFlight {
 
   itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   flight Flight @relation(fields: [flightId], references: [id])
+  travelers Traveler[] @relation("FlightBookingTravelers")
 
   @@map("itinerary_flight")
 }
