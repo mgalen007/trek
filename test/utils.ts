@@ -18,6 +18,11 @@ export const day = (offset: number) => {
 
 export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
+// For supertest's .expect(): asserts the machine-readable error code.
+export const hasCode = (code: string) => (res: { body: unknown }) => {
+  expect((res.body as { error?: { code?: string } }).error?.code).toBe(code);
+};
+
 // Boots the app exactly like main.ts does and empties the test database.
 export async function createTestApp() {
   const moduleFixture = await Test.createTestingModule({

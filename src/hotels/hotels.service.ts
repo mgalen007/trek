@@ -8,10 +8,8 @@ import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { Prisma } from '../../generated/prisma/client';
-import {
-  getPaginationParams,
-  paginationMetadata,
-} from 'common/helpers/pagination.helpers';
+import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { toPage } from 'common/http/page';
 import { toDateOnly } from 'common/helpers/date.helpers';
 import { HotelSearchParams } from './types/hotel-search.types';
 
@@ -53,7 +51,7 @@ export class HotelsService {
         this.prisma.hotel.count({ where }),
       ]);
 
-      return { hotels, pagination: paginationMetadata(skip, limit, total) };
+      return toPage(hotels, skip, limit, total);
     }
 
     // Availability depends on bookings, so it can't be a plain SQL filter:
@@ -83,10 +81,7 @@ export class HotelsService {
       availableRooms: available.get(id)!,
     }));
 
-    return {
-      hotels,
-      pagination: paginationMetadata(skip, limit, matching.length),
-    };
+    return toPage(hotels, skip, limit, matching.length);
   }
 
   async update(id: string, dto: UpdateHotelDto) {

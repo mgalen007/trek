@@ -7,10 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateFlightDto } from './dto/update-flight.dto';
 import { CreateFlightDto } from './dto/create-flight.dto';
 import { Prisma } from '../../generated/prisma/client';
-import {
-  getPaginationParams,
-  paginationMetadata,
-} from 'common/helpers/pagination.helpers';
+import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { toPage } from 'common/http/page';
 import { addDays, toDateOnly } from 'common/helpers/date.helpers';
 import { FlightSearchParams } from './types/flight-search.types';
 
@@ -76,7 +74,7 @@ export class FlightsService {
       this.prisma.flight.count({ where }),
     ]);
 
-    return { flights, pagination: paginationMetadata(skip, limit, total) };
+    return toPage(flights, skip, limit, total);
   }
 
   private buildWhere(query: FlightSearchParams): Prisma.FlightWhereInput {

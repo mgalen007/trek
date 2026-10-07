@@ -14,10 +14,9 @@ import {
 import type { Itinerary } from '../../generated/prisma/client';
 import { Role } from '../auth/types/auth.types';
 import type { ICurrentUser } from '../auth/types/user.types';
-import {
-  getPaginationParams,
-  paginationMetadata,
-} from 'common/helpers/pagination.helpers';
+import { getPaginationParams } from 'common/helpers/pagination.helpers';
+import { toPage } from 'common/http/page';
+import { apiError, ErrorCode } from 'common/http/api-error';
 import { DAY_MS, toDateOnly } from 'common/helpers/date.helpers';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
@@ -105,7 +104,7 @@ export class ItinerariesService {
       this.prisma.itinerary.count({ where }),
     ]);
 
-    return { itineraries, pagination: paginationMetadata(skip, limit, total) };
+    return toPage(itineraries, skip, limit, total);
   }
 
   async findOne(id: string, currentUser: ICurrentUser) {
@@ -190,7 +189,10 @@ export class ItinerariesService {
     );
     if (dto.rooms > available)
       throw new ConflictException(
-        `Only ${available} room(s) available at ${hotel.name} for those dates`,
+        apiError(
+          ErrorCode.ROOMS_UNAVAILABLE,
+          `Only ${available} room(s) available at ${hotel.name} for those dates`,
+        ),
       );
 
     const nights = nightsBetween(checkIn, checkOut);
@@ -236,7 +238,10 @@ export class ItinerariesService {
       throw new BadRequestException('Flight must depart within the trip dates');
     if (dto.passengers > flight.availableSeats)
       throw new ConflictException(
-        `Only ${flight.availableSeats} seat(s) left on flight ${flight.flightNumber}`,
+        apiError(
+          ErrorCode.SEATS_UNAVAILABLE,
+          `Only ${flight.availableSeats} seat(s) left on flight ${flight.flightNumber}`,
+        ),
       );
 
     await this.prisma.itineraryFlight.create({
@@ -295,7 +300,10 @@ export class ItinerariesService {
         );
         if (stay.rooms > available)
           throw new ConflictException(
-            `Only ${available} room(s) left at ${stay.hotel.name} for those dates`,
+            apiError(
+              ErrorCode.ROOMS_UNAVAILABLE,
+              `Only ${available} room(s) left at ${stay.hotel.name} for those dates`,
+            ),
           );
 
         const nights = nightsBetween(stay.checkInDate, stay.checkOutDate);
@@ -323,7 +331,10 @@ export class ItinerariesService {
         );
         if (!reserved)
           throw new ConflictException(
-            `Not enough seats left on flight ${item.flight.flightNumber}`,
+            apiError(
+              ErrorCode.SEATS_UNAVAILABLE,
+              `Not enough seats left on flight ${item.flight.flightNumber}`,
+            ),
           );
 
         await tx.itineraryFlight.update({
@@ -401,7 +412,10 @@ export class ItinerariesService {
   private assertStatus(itinerary: Itinerary, ...allowed: ItineraryStatus[]) {
     if (!allowed.includes(itinerary.status))
       throw new ConflictException(
-        `Itinerary is ${itinerary.status}; this action requires ${allowed.join(' or ')}`,
+        apiError(
+          ErrorCode.INVALID_STATUS,
+          `Itinerary is ${itinerary.status}; this action requires ${allowed.join(' or ')}`,
+        ),
       );
   }
 
@@ -445,7 +459,10 @@ export class ItinerariesService {
         if (!isWriteConflict(err)) throw err;
         if (attempt >= MAX_TX_ATTEMPTS)
           throw new ConflictException(
-            'Booking conflicted with another request, please retry',
+            apiError(
+              ErrorCode.BOOKING_CONFLICT,
+              'Booking conflicted with another request, please retry',
+            ),
           );
       }
     }

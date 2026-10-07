@@ -23,14 +23,13 @@ describe('Search & discovery (e2e)', () => {
       .set(auth(admin))
       .send(body)
       .expect(201);
-    return res.body.id as string;
+    return res.body.data.id as string;
   };
 
-  const names = (res: { body: { hotels: { name: string }[] } }) =>
-    res.body.hotels.map((h) => h.name);
-  const flightNumbers = (res: {
-    body: { flights: { flightNumber: string }[] };
-  }) => res.body.flights.map((f) => f.flightNumber);
+  const names = (res: { body: { data: { name: string }[] } }) =>
+    res.body.data.map((h) => h.name);
+  const flightNumbers = (res: { body: { data: { flightNumber: string }[] } }) =>
+    res.body.data.map((f) => f.flightNumber);
 
   beforeAll(async () => {
     ctx = await createTestApp();
@@ -141,7 +140,7 @@ describe('Search & discovery (e2e)', () => {
       .expect(201);
     await ctx
       .api()
-      .post(`/api/itineraries/${trip.body.id}/hotels`)
+      .post(`/api/itineraries/${trip.body.data.id}/hotels`)
       .set(auth(user))
       .send({
         hotelId: hillViewId,
@@ -152,7 +151,7 @@ describe('Search & discovery (e2e)', () => {
       .expect(201);
     await ctx
       .api()
-      .post(`/api/itineraries/${trip.body.id}/confirm`)
+      .post(`/api/itineraries/${trip.body.data.id}/confirm`)
       .set(auth(user))
       .expect(200);
   });
@@ -174,7 +173,7 @@ describe('Search & discovery (e2e)', () => {
         'Serena',
         'Unrated Lodge',
       ]);
-      expect(res.body.hotels[0].destination.name).toBe('Kigali');
+      expect(res.body.data[0].destination.name).toBe('Kigali');
       expect(res.body.pagination).toMatchObject({ total: 5, totalPages: 1 });
     });
 
@@ -232,7 +231,7 @@ describe('Search & discovery (e2e)', () => {
 
       expect(names(res)).not.toContain('Hill View');
       expect(res.body.pagination.total).toBe(4);
-      const budget = res.body.hotels.find(
+      const budget = res.body.data.find(
         (h: { name: string }) => h.name === 'Budget Inn',
       );
       expect(budget.availableRooms).toBe(1);
@@ -252,7 +251,7 @@ describe('Search & discovery (e2e)', () => {
         `/api/hotels?destinationId=${kigaliId}&checkIn=${day(33)}&checkOut=${day(35)}&rooms=2`,
       ).expect(200);
 
-      const hillView = res.body.hotels.find(
+      const hillView = res.body.data.find(
         (h: { id: string }) => h.id === hillViewId,
       );
       expect(hillView.availableRooms).toBe(2);
@@ -275,8 +274,8 @@ describe('Search & discovery (e2e)', () => {
       const res = await get('/api/flights').expect(200);
 
       expect(flightNumbers(res)).toEqual(['WB101', 'KQ200', 'WB103', 'WB900']);
-      expect(res.body.flights[0].departureAirport.code).toBe('NBO');
-      expect(res.body.flights[0].arrivalAirport.code).toBe('KGL');
+      expect(res.body.data[0].departureAirport.code).toBe('NBO');
+      expect(res.body.data[0].arrivalAirport.code).toBe('KGL');
       expect(res.body.pagination.total).toBe(4);
     });
 
@@ -320,20 +319,21 @@ describe('Search & discovery (e2e)', () => {
   describe('destinations', () => {
     it('searches name, city and country with q', async () => {
       const byCountry = await get('/api/destinations?q=rwanda').expect(200);
-      expect(
-        byCountry.body.destinations.map((d: { name: string }) => d.name),
-      ).toEqual(['Kigali', 'Volcanoes']);
+      expect(byCountry.body.data.map((d: { name: string }) => d.name)).toEqual([
+        'Kigali',
+        'Volcanoes',
+      ]);
 
       const byCity = await get('/api/destinations?q=musan').expect(200);
-      expect(
-        byCity.body.destinations.map((d: { name: string }) => d.name),
-      ).toEqual(['Volcanoes']);
+      expect(byCity.body.data.map((d: { name: string }) => d.name)).toEqual([
+        'Volcanoes',
+      ]);
     });
 
     it('filters by exact country', async () => {
       const res = await get('/api/destinations?country=kenya').expect(200);
 
-      expect(res.body.destinations).toHaveLength(1);
+      expect(res.body.data).toHaveLength(1);
       expect(res.body.pagination).toMatchObject({ total: 1, totalPages: 1 });
     });
 
@@ -357,7 +357,7 @@ describe('Search & discovery (e2e)', () => {
         200,
       );
 
-      expect(res.body.airports.map((a: { code: string }) => a.code)).toEqual([
+      expect(res.body.data.map((a: { code: string }) => a.code)).toEqual([
         'NBO',
         'WIL',
       ]);
@@ -372,7 +372,7 @@ describe('Search & discovery (e2e)', () => {
   it('filters airports by code', async () => {
     const res = await get('/api/airports?code=kgl').expect(200);
 
-    expect(res.body.airports).toHaveLength(1);
-    expect(res.body.airports[0].destinationId).toBe(kigaliId);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].destinationId).toBe(kigaliId);
   });
 });
