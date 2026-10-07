@@ -80,6 +80,20 @@ describe('OpenAPI docs (e2e)', () => {
     }
   });
 
+  it('accepts an Idempotency-Key on every authenticated POST', () => {
+    const posts = Object.entries(doc.paths).flatMap(([, methods]) =>
+      methods.post ? [methods.post] : [],
+    );
+
+    for (const o of posts) {
+      if (PUBLIC_OPERATIONS.includes(o.operationId)) continue;
+      const header = o.parameters?.find(
+        (p) => p.in === 'header' && p.name === 'Idempotency-Key',
+      );
+      expect([o.operationId, Boolean(header)]).toEqual([o.operationId, true]);
+    }
+  });
+
   it('resolves every schema reference', () => {
     const refs = JSON.stringify(doc).match(/#\/components\/schemas\/\w+/g);
 
