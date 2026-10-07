@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ItinerariesService } from './itineraries.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -21,13 +22,35 @@ import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
 import { AddFlightDto } from './dto/add-flight.dto';
 import { ItineraryQueryParams } from './types/itinerary-query.types';
+import {
+  ItineraryDetailEntity,
+  ItineraryEntity,
+  ItinerarySummaryEntity,
+} from './entities/itinerary.entity';
+import {
+  ApiDataResponse,
+  ApiErrorResponses,
+  ApiPageResponse,
+} from 'common/http/api-response.decorators';
 
+const NOT_DRAFT = 'Itinerary is not a DRAFT (INVALID_STATUS)';
+
+@ApiTags('Itineraries')
+@ApiBearerAuth()
+@ApiErrorResponses([HttpStatus.UNAUTHORIZED])
 @UseGuards(JwtAuthGuard)
 @Controller('itineraries')
 export class ItinerariesController {
   constructor(private itinerariesService: ItinerariesService) {}
 
   @Post()
+  @ApiOperation({
+    summary: 'Start a draft itinerary',
+    description:
+      'Creates an empty DRAFT trip. Add hotel stays and flights, then confirm it to reserve everything at once.',
+  })
+  @ApiDataResponse(ItineraryDetailEntity, { status: HttpStatus.CREATED })
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
   async create(
     @Body() dto: CreateItineraryDto,
     @CurrentUser() currentUser: ICurrentUser,
@@ -38,6 +61,9 @@ export class ItinerariesController {
   }
 
   @Get()
+  @ApiOperation({ summary: "List the current user's itineraries" })
+  @ApiPageResponse(ItinerarySummaryEntity)
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST])
   async findAll(
     @Query() query: ItineraryQueryParams,
     @CurrentUser() currentUser: ICurrentUser,
@@ -51,6 +77,12 @@ export class ItinerariesController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Get an itinerary with its hotel stays, flights and totals',
+    description: "Other users' itineraries are reported as not found.",
+  })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() currentUser: ICurrentUser,
@@ -61,6 +93,12 @@ export class ItinerariesController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Rename or re-date a draft itinerary' })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    { [HttpStatus.CONFLICT]: NOT_DRAFT },
+  )
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateItineraryDto,
@@ -76,6 +114,14 @@ export class ItinerariesController {
   }
 
   @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete a draft or cancelled itinerary',
+    description: 'Planned itineraries must be cancelled first.',
+  })
+  @ApiDataResponse(ItineraryEntity)
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]: 'Itinerary is PLANNED or COMPLETED (INVALID_STATUS)',
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() currentUser: ICurrentUser,
@@ -86,6 +132,18 @@ export class ItinerariesController {
   }
 
   @Post(':id/hotels')
+  @ApiOperation({
+    summary: 'Add a hotel stay to a draft',
+    description:
+      'The hotel must be at the itinerary destination and the stay within the trip dates. Rooms are checked now but only reserved on confirm.',
+  })
+  @ApiDataResponse(ItineraryDetailEntity, { status: HttpStatus.CREATED })
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    {
+      [HttpStatus.CONFLICT]: `Not enough free rooms (ROOMS_UNAVAILABLE), or ${NOT_DRAFT}`,
+    },
+  )
   async addHotel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddHotelDto,
@@ -101,6 +159,12 @@ export class ItinerariesController {
   }
 
   @Delete(':id/hotels/:itemId')
+  @ApiOperation({ summary: 'Remove a hotel stay from a draft' })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    { [HttpStatus.CONFLICT]: NOT_DRAFT },
+  )
   async removeHotel(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
@@ -116,6 +180,18 @@ export class ItinerariesController {
   }
 
   @Post(':id/flights')
+  @ApiOperation({
+    summary: 'Add a flight to a draft',
+    description:
+      'The flight must depart within the trip dates. Seats are checked now but only reserved on confirm.',
+  })
+  @ApiDataResponse(ItineraryDetailEntity, { status: HttpStatus.CREATED })
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    {
+      [HttpStatus.CONFLICT]: `Not enough seats (SEATS_UNAVAILABLE), or ${NOT_DRAFT}`,
+    },
+  )
   async addFlight(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddFlightDto,
@@ -131,6 +207,12 @@ export class ItinerariesController {
   }
 
   @Delete(':id/flights/:itemId')
+  @ApiOperation({ summary: 'Remove a flight from a draft' })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    { [HttpStatus.CONFLICT]: NOT_DRAFT },
+  )
   async removeFlight(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
@@ -147,6 +229,18 @@ export class ItinerariesController {
 
   @Post(':id/confirm')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Confirm a draft, reserving everything',
+    description:
+      'DRAFT -> PLANNED. Re-checks and reserves every room and seat at current prices, all or nothing. On BOOKING_CONFLICT a concurrent booking interfered: retry.',
+  })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    {
+      [HttpStatus.CONFLICT]: `ROOMS_UNAVAILABLE, SEATS_UNAVAILABLE, BOOKING_CONFLICT (retry), or ${NOT_DRAFT}`,
+    },
+  )
   async confirm(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() currentUser: ICurrentUser,
@@ -158,6 +252,15 @@ export class ItinerariesController {
 
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel a planned itinerary, releasing everything',
+    description:
+      'PLANNED -> CANCELLED. Seats and rooms become available again.',
+  })
+  @ApiDataResponse(ItineraryDetailEntity)
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]: 'Itinerary is not PLANNED (INVALID_STATUS)',
+  })
   async cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() currentUser: ICurrentUser,

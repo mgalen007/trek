@@ -8,6 +8,7 @@ import { HttpAdapterHost } from '@nestjs/core';
 import { ApiExceptionFilter } from '../common/filters/api-exception.filter';
 import { EnvelopeInterceptor } from '../common/http/envelope.interceptor';
 import { apiError, ErrorCode } from '../common/http/api-error';
+import { setupOpenApi } from './openapi';
 
 // Flattens nested class-validator errors into [{ field, errors }], with
 // dotted paths for nested fields (e.g. "address.city").
@@ -49,4 +50,6 @@ export function configureApp(app: INestApplication) {
         ),
     }),
   );
+
+  setupOpenApi(app);
 }

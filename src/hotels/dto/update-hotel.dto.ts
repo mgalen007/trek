@@ -1,41 +1,5 @@
-import {
-  IsString,
-  IsUUID,
-  Length,
-  IsInt,
-  IsNumber,
-  Min,
-  IsOptional,
-} from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { CreateHotelDto } from './create-hotel.dto';
 
-export class UpdateHotelDto {
-  @IsOptional()
-  @IsUUID()
-  destinationId?: string;
-
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  address?: string;
-
-  @IsOptional()
-  @IsNumber()
-  rating?: number;
-
-  @IsOptional()
-  @IsNumber()
-  nightlyRate?: number;
-
-  @IsOptional()
-  @IsString()
-  @Length(3, 3)
-  currency?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  totalRooms?: number;
-}
+/** Same fields and rules as CreateHotelDto, all optional. */
+export class UpdateHotelDto extends PartialType(CreateHotelDto) {}
