@@ -1,26 +1,9 @@
 // supertest types response bodies as `any`; asserting on them is the point here.
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
-import { configureApp } from './../src/app.setup';
-import { PrismaService } from './../src/prisma/prisma.service';
-
-const PASSWORD = 'password123';
-
-// Calendar day `offset` days from today, as YYYY-MM-DD.
-const day = (offset: number) => {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  d.setUTCDate(d.getUTCDate() + offset);
-  return d.toISOString().slice(0, 10);
-};
+import { auth, createTestApp, day } from './utils';
 
 describe('Itineraries (e2e)', () => {
-  let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let ctx: Awaited<ReturnType<typeof createTestApp>>;
 
   let admin: string;
   let alice: string;
@@ -35,23 +18,9 @@ describe('Itineraries (e2e)', () => {
   let aliceTrip: string;
   let bobTrip: string;
 
-  const api = () => request(app.getHttpServer());
-  const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
-
-  const signUp = async (email: string, role: 'USER' | 'ADMIN' = 'USER') => {
-    await api()
-      .post('/api/auth/register')
-      .send({ email, password: PASSWORD, firstName: 'Test', lastName: 'User' })
-      .expect(201);
-    if (role === 'ADMIN')
-      await prisma.user.update({ where: { email }, data: { role } });
-
-    const res = await api()
-      .post('/api/auth/login')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-    return res.body.data.token as string;
-  };
+  const api = () => ctx.api();
+  const signUp = (email: string, role?: 'USER' | 'ADMIN') =>
+    ctx.signUp(email, role);
 
   const adminPost = async (path: string, body: object) => {
     const res = await api().post(path).set(auth(admin)).send(body).expect(201);
@@ -81,23 +50,7 @@ describe('Itineraries (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    configureApp(app);
-    await app.init();
-    prisma = app.get(PrismaService);
-
-    const [{ db }] = await prisma.$queryRaw<
-      { db: string }[]
-    >`SELECT current_database() AS db`;
-    if (!db.endsWith('_test'))
-      throw new Error(`Refusing to truncate non-test database "${db}"`);
-    await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE itinerary_flight, itinerary_hotel, itineraries, flights, airports, hotels, destinations, users CASCADE',
-    );
+    ctx = await createTestApp();
 
     admin = await signUp('admin@trek.test', 'ADMIN');
     alice = await signUp('alice@trek.test');
@@ -161,7 +114,7 @@ describe('Itineraries (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.app.close();
   });
 
   describe('drafting', () => {
@@ -426,7 +379,13 @@ describe('Itineraries (e2e)', () => {
         .set(auth(bob))
         .expect(200);
       expect(all.body.itineraries).toHaveLength(2);
-      expect(all.body.pagination).toEqual({ page: 1, skip: 0, limit: 15 });
+      expect(all.body.pagination).toEqual({
+        page: 1,
+        skip: 0,
+        limit: 15,
+        total: 2,
+        totalPages: 1,
+      });
 
       const planned = await api()
         .get('/api/itineraries?status=PLANNED')
@@ -470,7 +429,7 @@ describe('Itineraries (e2e)', () => {
       );
 
       expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-      const confirmed = await prisma.itineraryHotel.count({
+      const confirmed = await ctx.prisma.itineraryHotel.count({
         where: { hotelId: tinyInnId, status: 'CONFIRMED' },
       });
       expect(confirmed).toBe(1);
