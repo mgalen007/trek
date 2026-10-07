@@ -1,27 +1,35 @@
-import { IsString, IsUUID, Length, IsInt, IsNumber, Min, IsOptional } from 'class-validator'
+import {
+  IsString,
+  IsUUID,
+  Length,
+  IsInt,
+  IsNumber,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateHotelDto {
   @IsUUID()
-  destinationId: string
+  destinationId: string;
 
   @IsString()
-  name: string
+  name: string;
 
   @IsString()
-  address: string
+  address: string;
 
   @IsOptional()
   @IsNumber()
-  rating?: number
- 
+  rating?: number;
+
   @IsNumber()
-  nightlyRate: number
- 
+  nightlyRate: number;
+
   @IsString()
   @Length(3, 3)
-  currency: string
+  currency: string;
 
   @IsInt()
   @Min(1)
-  totalRooms: number
+  totalRooms: number;
 }
