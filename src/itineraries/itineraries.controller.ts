@@ -189,6 +189,8 @@ export class ItinerariesController {
   @ApiErrorResponses(
     [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
     {
+      [HttpStatus.BAD_REQUEST]:
+        "Invalid input, passengers not matching travelerIds, or someone else's traveler (INVALID_REFERENCE)",
       [HttpStatus.CONFLICT]: `Not enough seats (SEATS_UNAVAILABLE), or ${NOT_DRAFT}`,
     },
   )
