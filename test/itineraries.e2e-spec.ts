@@ -1,6 +1,6 @@
 // supertest types response bodies as `any`; asserting on them is the point here.
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { auth, createTestApp, day } from './utils';
+import { auth, createTestApp, day, hasCode } from './utils';
 
 describe('Itineraries (e2e)', () => {
   let ctx: Awaited<ReturnType<typeof createTestApp>>;
@@ -24,7 +24,7 @@ describe('Itineraries (e2e)', () => {
 
   const adminPost = async (path: string, body: object) => {
     const res = await api().post(path).set(auth(admin)).send(body).expect(201);
-    return res.body.id as string;
+    return res.body.data.id as string;
   };
 
   const createTrip = async (token: string, name = 'Kigali trip') => {
@@ -38,7 +38,7 @@ describe('Itineraries (e2e)', () => {
         endDate: day(35),
       })
       .expect(201);
-    return res.body.id as string;
+    return res.body.data.id as string;
   };
 
   const seatsLeft = async () => {
@@ -46,7 +46,7 @@ describe('Itineraries (e2e)', () => {
       .get(`/api/flights/${flightId}`)
       .set(auth(admin))
       .expect(200);
-    return res.body.availableSeats as number;
+    return res.body.data.availableSeats as number;
   };
 
   beforeAll(async () => {
@@ -137,11 +137,11 @@ describe('Itineraries (e2e)', () => {
         .send({ flightId, passengers: 2 })
         .expect(201);
 
-      expect(res.body.status).toBe('DRAFT');
-      expect(res.body.itineraryHotel).toHaveLength(1);
-      expect(res.body.itineraryFlight).toHaveLength(1);
+      expect(res.body.data.status).toBe('DRAFT');
+      expect(res.body.data.itineraryHotel).toHaveLength(1);
+      expect(res.body.data.itineraryFlight).toHaveLength(1);
       // 3 nights x 2 rooms x 100 + 2 passengers x 250
-      expect(Number(res.body.totals.USD)).toBe(1100);
+      expect(Number(res.body.data.totals.USD)).toBe(1100);
     });
 
     it('rejects invalid stays and trips', async () => {
@@ -174,7 +174,9 @@ describe('Itineraries (e2e)', () => {
         checkInDate: day(30),
         checkOutDate: day(31),
         rooms: 3,
-      }).expect(409);
+      })
+        .expect(409)
+        .expect(hasCode('ROOMS_UNAVAILABLE'));
       await add({
         hotelId,
         checkInDate: day(30),
@@ -255,9 +257,9 @@ describe('Itineraries (e2e)', () => {
         .set(auth(alice))
         .expect(200);
 
-      expect(res.body.status).toBe('PLANNED');
-      expect(res.body.itineraryHotel[0].status).toBe('CONFIRMED');
-      expect(res.body.itineraryFlight[0].status).toBe('CONFIRMED');
+      expect(res.body.data.status).toBe('PLANNED');
+      expect(res.body.data.itineraryHotel[0].status).toBe('CONFIRMED');
+      expect(res.body.data.itineraryFlight[0].status).toBe('CONFIRMED');
       expect(await seatsLeft()).toBe(1);
     });
 
@@ -265,7 +267,8 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${bobTrip}/confirm`)
         .set(auth(bob))
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('ROOMS_UNAVAILABLE'));
       await api()
         .post(`/api/itineraries/${bobTrip}/hotels`)
         .set(auth(bob))
@@ -275,7 +278,8 @@ describe('Itineraries (e2e)', () => {
           checkOutDate: day(32),
           rooms: 1,
         })
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('ROOMS_UNAVAILABLE'));
     });
 
     it('rolls back hotel stays when a flight is full', async () => {
@@ -286,7 +290,7 @@ describe('Itineraries (e2e)', () => {
       // Swap the clashing stay for one starting on Alice's checkout day.
       await api()
         .delete(
-          `/api/itineraries/${bobTrip}/hotels/${trip.body.itineraryHotel[0].id}`,
+          `/api/itineraries/${bobTrip}/hotels/${trip.body.data.itineraryHotel[0].id}`,
         )
         .set(auth(bob))
         .expect(200);
@@ -304,14 +308,15 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${bobTrip}/confirm`)
         .set(auth(bob))
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('SEATS_UNAVAILABLE'));
 
       const after = await api()
         .get(`/api/itineraries/${bobTrip}`)
         .set(auth(bob))
         .expect(200);
-      expect(after.body.status).toBe('DRAFT');
-      expect(after.body.itineraryHotel[0].status).toBe('HELD');
+      expect(after.body.data.status).toBe('DRAFT');
+      expect(after.body.data.itineraryHotel[0].status).toBe('HELD');
       expect(await seatsLeft()).toBe(1);
     });
 
@@ -320,16 +325,19 @@ describe('Itineraries (e2e)', () => {
         .put(`/api/itineraries/${aliceTrip}`)
         .set(auth(alice))
         .send({ name: 'Renamed' })
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('INVALID_STATUS'));
       await api()
         .post(`/api/itineraries/${aliceTrip}/flights`)
         .set(auth(alice))
         .send({ flightId, passengers: 1 })
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('INVALID_STATUS'));
       await api()
         .delete(`/api/itineraries/${aliceTrip}`)
         .set(auth(alice))
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('INVALID_STATUS'));
     });
   });
 
@@ -340,8 +348,8 @@ describe('Itineraries (e2e)', () => {
         .set(auth(alice))
         .expect(200);
 
-      expect(res.body.status).toBe('CANCELLED');
-      expect(res.body.itineraryFlight[0].status).toBe('CANCELLED');
+      expect(res.body.data.status).toBe('CANCELLED');
+      expect(res.body.data.itineraryFlight[0].status).toBe('CANCELLED');
       expect(await seatsLeft()).toBe(3);
 
       await api()
@@ -355,7 +363,8 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${aliceTrip}/cancel`)
         .set(auth(alice))
-        .expect(409);
+        .expect(409)
+        .expect(hasCode('INVALID_STATUS'));
     });
 
     it('lets cancelled itineraries be deleted', async () => {
@@ -378,7 +387,7 @@ describe('Itineraries (e2e)', () => {
         .get('/api/itineraries')
         .set(auth(bob))
         .expect(200);
-      expect(all.body.itineraries).toHaveLength(2);
+      expect(all.body.data).toHaveLength(2);
       expect(all.body.pagination).toEqual({
         page: 1,
         skip: 0,
@@ -391,14 +400,14 @@ describe('Itineraries (e2e)', () => {
         .get('/api/itineraries?status=PLANNED')
         .set(auth(bob))
         .expect(200);
-      expect(planned.body.itineraries).toHaveLength(1);
-      expect(planned.body.itineraries[0].id).toBe(bobTrip);
+      expect(planned.body.data).toHaveLength(1);
+      expect(planned.body.data[0].id).toBe(bobTrip);
 
       const alices = await api()
         .get('/api/itineraries')
         .set(auth(alice))
         .expect(200);
-      expect(alices.body.itineraries).toHaveLength(0);
+      expect(alices.body.data).toHaveLength(0);
     });
   });
 
