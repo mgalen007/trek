@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDestinationDto } from './dto/create-destination.dto';
-import { PaginationQueryParams } from 'common/types/pagination.types';
+import { Prisma } from '../../generated/prisma/client';
+import { BrowsingQueryParams } from './types/browsing.types';
 import {
   getPaginationParams,
   paginationMetadata,
@@ -18,32 +19,47 @@ export class DestinationsService {
     return destination;
   }
 
-  async findAll(options: PaginationQueryParams) {
-    const { skip, l: limit } = getPaginationParams(options.page, options.limit);
-    const destinations = await this.prisma.destination.findMany({
-      take: limit,
-      skip,
+  async findAll(query: BrowsingQueryParams) {
+    const { skip, l: limit } = getPaginationParams(query.page, query.limit);
+    const contains = (value: string) => ({
+      contains: value,
+      mode: 'insensitive' as const,
     });
+    const where: Prisma.DestinationWhereInput = {
+      name: query.name ? contains(query.name) : undefined,
+      country: query.country
+        ? { equals: query.country, mode: 'insensitive' }
+        : undefined,
+      OR: query.q
+        ? [
+            { name: contains(query.q) },
+            { city: contains(query.q) },
+            { country: contains(query.q) },
+          ]
+        : undefined,
+    };
 
-    return { destinations, pagination: paginationMetadata(skip, limit) };
-  }
+    const [destinations, total] = await this.prisma.$transaction([
+      this.prisma.destination.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: limit,
+        skip,
+      }),
+      this.prisma.destination.count({ where }),
+    ]);
 
-  async findByName(name: string, options: PaginationQueryParams) {
-    const { skip, l: limit } = getPaginationParams(options.page, options.limit);
-    const destinations = await this.prisma.destination.findMany({
-      where: { name: { contains: name, mode: 'insensitive' } },
-      take: limit,
-      skip,
-    });
-
-    return { destinations, pagination: paginationMetadata(skip, limit) };
+    return {
+      destinations,
+      pagination: paginationMetadata(skip, limit, total),
+    };
   }
 
   async findOneById(id: string) {
     const destination = await this.prisma.destination.findUnique({
       where: { id },
     });
-    if (!destination) throw new NotFoundException('Destinaion not found');
+    if (!destination) throw new NotFoundException('Destination not found');
 
     return destination;
   }

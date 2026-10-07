@@ -4,6 +4,38 @@ import { BookingStatus, Prisma } from '../../generated/prisma/client';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
+type Stay = { checkInDate: Date; checkOutDate: Date; rooms: number };
+
+// Peak number of rooms held on any night from `from` onwards. Stays are swept
+// as +rooms / -rooms events so that two bookings that overlap the range but
+// not each other aren't summed.
+const peakRooms = (stays: Stay[], from: Date) => {
+  const events = stays.flatMap((s) => [
+    {
+      at: Math.max(s.checkInDate.getTime(), from.getTime()),
+      delta: s.rooms,
+    },
+    { at: s.checkOutDate.getTime(), delta: -s.rooms },
+  ]);
+  // Checkouts free rooms before same-day check-ins take them.
+  events.sort((a, b) => a.at - b.at || a.delta - b.delta);
+
+  let current = 0;
+  let peak = 0;
+  for (const e of events) {
+    current += e.delta;
+    peak = Math.max(peak, current);
+  }
+
+  return peak;
+};
+
+const overlappingConfirmedStays = (checkIn: Date, checkOut: Date) => ({
+  status: BookingStatus.CONFIRMED,
+  checkInDate: { lt: checkOut },
+  checkOutDate: { gt: checkIn },
+});
+
 // Single place that answers "is there room?" and holds/releases inventory.
 // Today it is backed by our own tables; external providers (Amadeus, Duffel…)
 // can later implement the same methods.
@@ -12,8 +44,7 @@ export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
   // Peak number of rooms held by CONFIRMED stays on any night in
-  // [checkIn, checkOut). Stays are swept as +rooms / -rooms events so that
-  // two bookings that overlap the range but not each other aren't summed.
+  // [checkIn, checkOut).
   async bookedHotelRooms(
     hotelId: string,
     checkIn: Date,
@@ -21,33 +52,47 @@ export class InventoryService {
     db: Db = this.prisma,
   ) {
     const stays = await db.itineraryHotel.findMany({
-      where: {
-        hotelId,
-        status: BookingStatus.CONFIRMED,
-        checkInDate: { lt: checkOut },
-        checkOutDate: { gt: checkIn },
-      },
+      where: { hotelId, ...overlappingConfirmedStays(checkIn, checkOut) },
       select: { checkInDate: true, checkOutDate: true, rooms: true },
     });
 
-    const events = stays.flatMap((s) => [
-      {
-        at: Math.max(s.checkInDate.getTime(), checkIn.getTime()),
-        delta: s.rooms,
-      },
-      { at: s.checkOutDate.getTime(), delta: -s.rooms },
-    ]);
-    // Checkouts free rooms before same-day check-ins take them.
-    events.sort((a, b) => a.at - b.at || a.delta - b.delta);
+    return peakRooms(stays, checkIn);
+  }
 
-    let current = 0;
-    let peak = 0;
-    for (const e of events) {
-      current += e.delta;
-      peak = Math.max(peak, current);
+  // Free rooms per hotel for [checkIn, checkOut), using one query for all of
+  // them. Used by search, where checking hotels one by one would be N+1.
+  async availableRoomsByHotel(
+    hotels: { id: string; totalRooms: number }[],
+    checkIn: Date,
+    checkOut: Date,
+    db: Db = this.prisma,
+  ) {
+    const stays = await db.itineraryHotel.findMany({
+      where: {
+        hotelId: { in: hotels.map((h) => h.id) },
+        ...overlappingConfirmedStays(checkIn, checkOut),
+      },
+      select: {
+        hotelId: true,
+        checkInDate: true,
+        checkOutDate: true,
+        rooms: true,
+      },
+    });
+
+    const staysByHotel = new Map<string, Stay[]>();
+    for (const stay of stays) {
+      const list = staysByHotel.get(stay.hotelId) ?? [];
+      list.push(stay);
+      staysByHotel.set(stay.hotelId, list);
     }
 
-    return peak;
+    return new Map(
+      hotels.map((h) => [
+        h.id,
+        h.totalRooms - peakRooms(staysByHotel.get(h.id) ?? [], checkIn),
+      ]),
+    );
   }
 
   async availableHotelRooms(

@@ -15,7 +15,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Role } from 'src/auth/types/auth.types';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CreateFlightDto } from './dto/create-flight.dto';
-import { PaginationQueryParams } from 'common/types/pagination.types';
+import { FlightSearchParams } from './types/flight-search.types';
 import { UpdateFlightDto } from './dto/update-flight.dto';
 
 @UseGuards(JwtAuthGuard)
@@ -40,7 +40,7 @@ export class FlightsController {
   }
 
   @Get()
-  async findAll(@Query() query: PaginationQueryParams) {
+  async findAll(@Query() query: FlightSearchParams) {
     const flights = await this.flightService.findAll(query);
 
     return flights;

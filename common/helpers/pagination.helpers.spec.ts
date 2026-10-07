@@ -10,11 +10,20 @@ describe('pagination helpers', () => {
     expect(getPaginationParams(page, limit)).toEqual(expected);
   });
 
-  it('derives the page back from skip and limit', () => {
-    expect(paginationMetadata(20, 10)).toEqual({
+  it('derives the page and page count from skip, limit and total', () => {
+    expect(paginationMetadata(20, 10, 25)).toEqual({
       page: 3,
       skip: 20,
       limit: 10,
+      total: 25,
+      totalPages: 3,
+    });
+  });
+
+  it('reports zero pages for an empty result', () => {
+    expect(paginationMetadata(0, 15, 0)).toMatchObject({
+      total: 0,
+      totalPages: 0,
     });
   });
 });

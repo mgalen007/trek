@@ -15,7 +15,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../auth/types/auth.types';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { CreateHotelDto } from './dto/create-hotel.dto';
-import { PaginationQueryParams } from 'common/types/pagination.types';
+import { HotelSearchParams } from './types/hotel-search.types';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 
 @UseGuards(JwtAuthGuard)
@@ -33,7 +33,7 @@ export class HotelsController {
   }
 
   @Get()
-  async findAll(@Query() query: PaginationQueryParams) {
+  async findAll(@Query() query: HotelSearchParams) {
     const hotels = await this.hotelsService.findAll(query);
 
     return hotels;

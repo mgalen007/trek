@@ -1,4 +1,6 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export const MAX_PAGE_SIZE = 100;
 
 export class PaginationQueryParams {
   @IsInt()
@@ -8,6 +10,7 @@ export class PaginationQueryParams {
 
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_SIZE)
   @IsOptional()
   limit?: number;
 }

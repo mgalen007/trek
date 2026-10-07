@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAirportDto } from './dto/create-airport.dto';
-import { PaginationQueryParams } from 'common/types/pagination.types';
+import { Prisma } from '../../generated/prisma/client';
+import { AirportQueryParams } from './types/airport-query.types';
 import {
   getPaginationParams,
   paginationMetadata,
@@ -25,14 +26,25 @@ export class AirportsService {
     return airport;
   }
 
-  async findAll(options: PaginationQueryParams) {
-    const { skip, l: limit } = getPaginationParams(options.page, options.limit);
-    const airports = await this.prisma.airport.findMany({
-      take: limit,
-      skip,
-    });
+  async findAll(query: AirportQueryParams) {
+    const { skip, l: limit } = getPaginationParams(query.page, query.limit);
+    const where: Prisma.AirportWhereInput = {
+      destinationId: query.destinationId,
+      code: query.code
+        ? { equals: query.code, mode: 'insensitive' }
+        : undefined,
+    };
+    const [airports, total] = await this.prisma.$transaction([
+      this.prisma.airport.findMany({
+        where,
+        orderBy: [{ code: 'asc' }, { id: 'asc' }],
+        take: limit,
+        skip,
+      }),
+      this.prisma.airport.count({ where }),
+    ]);
 
-    return { airports, pagination: paginationMetadata(skip, limit) };
+    return { airports, pagination: paginationMetadata(skip, limit, total) };
   }
 
   async update(id: string, dto: UpdateAirportDto) {
