@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same branch / PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint, typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3'
+
+      - run: bun install --frozen-lockfile
+      - run: bunx prisma generate
+      - run: bun run lint:check
+      - run: bun run typecheck
+      - run: bun run build
+
+  test:
+    name: Unit & e2e tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trek
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The e2e global setup creates and migrates trek_test from this URL.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trek
+      MAX_DB_CONNECTIONS: '10'
+      JWT_SECRET: ci-only-secret
+      JWT_EXPIRES_IN: 1h
+      BCRYPT_SALT_ROUNDS: '4'
+      SEED_ADMIN_EMAIL: admin@trek.ci
+      SEED_ADMIN_PASSWORD: ci-admin-password
+      SEED_ADMIN_FIRST_NAME: Ci
+      SEED_ADMIN_LAST_NAME: Admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3'
+
+      # Jest runs on Node (via its shebang); match the local major version.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+      - run: bunx prisma generate
+      - run: bun run test
+      - run: bun run test:e2e
