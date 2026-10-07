@@ -1,16 +1,10 @@
-import { IsDate, IsOptional, IsString, MinLength } from 'class-validator';
+import { PartialType, PickType } from '@nestjs/swagger';
+import { CreateItineraryDto } from './create-itinerary.dto';
 
-export class UpdateItineraryDto {
-  @IsOptional()
-  @IsString()
-  @MinLength(3)
-  name?: string;
-
-  @IsOptional()
-  @IsDate()
-  startDate?: Date;
-
-  @IsOptional()
-  @IsDate()
-  endDate?: Date;
-}
+/**
+ * Rename or move a DRAFT itinerary. New dates must still contain every
+ * hotel stay and flight already added.
+ */
+export class UpdateItineraryDto extends PartialType(
+  PickType(CreateItineraryDto, ['name', 'startDate', 'endDate'] as const),
+) {}

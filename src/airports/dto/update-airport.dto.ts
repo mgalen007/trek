@@ -1,17 +1,5 @@
-import { IsString, IsUUID, MinLength, IsOptional } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
+import { CreateAirportDto } from './create-airport.dto';
 
-export class UpdateAirportDto {
-  @IsOptional()
-  @IsUUID()
-  destinationId?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(3)
-  code?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(5)
-  name?: string;
-}
+/** Same fields and rules as CreateAirportDto, all optional. */
+export class UpdateAirportDto extends PartialType(CreateAirportDto) {}

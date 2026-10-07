@@ -208,11 +208,25 @@ describe('Itineraries (e2e)', () => {
     });
 
     it('rejects date changes that would strand existing items', async () => {
+      // BAD_REQUEST (not VALIDATION_FAILED): the date parsed fine and the
+      // business rule rejected it.
       await api()
         .put(`/api/itineraries/${aliceTrip}`)
         .set(auth(alice))
         .send({ startDate: day(31) })
-        .expect(400);
+        .expect(400)
+        .expect(hasCode('BAD_REQUEST'));
+    });
+
+    it('renames and extends a draft', async () => {
+      const res = await api()
+        .put(`/api/itineraries/${aliceTrip}`)
+        .set(auth(alice))
+        .send({ name: 'Alice in Kigali (long)', endDate: day(36) })
+        .expect(200);
+
+      expect(res.body.data.name).toBe('Alice in Kigali (long)');
+      expect(res.body.data.endDate).toBe(`${day(36)}T00:00:00.000Z`);
     });
 
     it('hides other users itineraries', async () => {
