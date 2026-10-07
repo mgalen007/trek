@@ -27,6 +27,17 @@ jobs:
       - run: bun run typecheck
       - run: bun run build
 
+      # Uses the build above, so the swagger CLI plugin's metadata is included.
+      - name: Export OpenAPI spec
+        run: bun dist/src/scripts/export-openapi.js openapi.json
+        env:
+          JWT_SECRET: ci-only-secret
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.json
+
   test:
     name: Unit & e2e tests
     runs-on: ubuntu-latest
