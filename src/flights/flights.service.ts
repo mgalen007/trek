@@ -6,11 +6,18 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateFlightDto } from './dto/update-flight.dto';
 import { CreateFlightDto } from './dto/create-flight.dto';
-import { PaginationQueryParams } from 'common/types/pagination.types';
+import { Prisma } from '../../generated/prisma/client';
 import {
   getPaginationParams,
   paginationMetadata,
 } from 'common/helpers/pagination.helpers';
+import { addDays, toDateOnly } from 'common/helpers/date.helpers';
+import { FlightSearchParams } from './types/flight-search.types';
+
+const AIRPORTS_INCLUDE = {
+  departureAirport: true,
+  arrivalAirport: true,
+} satisfies Prisma.FlightInclude;
 
 @Injectable()
 export class FlightsService {
@@ -38,20 +45,68 @@ export class FlightsService {
   }
 
   async findOneById(id: string) {
-    const flight = await this.prisma.flight.findUnique({ where: { id } });
+    const flight = await this.prisma.flight.findUnique({
+      where: { id },
+      include: AIRPORTS_INCLUDE,
+    });
     if (!flight) throw new NotFoundException('Flight not found');
 
     return flight;
   }
 
-  async findAll(options: PaginationQueryParams) {
-    const { skip, l: limit } = getPaginationParams(options.page, options.limit);
-    const flights = await this.prisma.flight.findMany({
-      take: limit,
-      skip,
-    });
+  // Only upcoming flights are listed; past ones are still reachable by id.
+  async findAll(query: FlightSearchParams) {
+    const { skip, l: limit } = getPaginationParams(query.page, query.limit);
+    const where = this.buildWhere(query);
+    const order = query.order ?? 'asc';
+    const orderBy: Prisma.FlightOrderByWithRelationInput[] = [
+      query.sort === 'price' ? { price: order } : { departureAt: order },
+      // id breaks ties so pages never overlap or skip flights.
+      { id: 'asc' },
+    ];
 
-    return { flights, pagination: paginationMetadata(skip, limit) };
+    const [flights, total] = await this.prisma.$transaction([
+      this.prisma.flight.findMany({
+        where,
+        orderBy,
+        include: AIRPORTS_INCLUDE,
+        take: limit,
+        skip,
+      }),
+      this.prisma.flight.count({ where }),
+    ]);
+
+    return { flights, pagination: paginationMetadata(skip, limit, total) };
+  }
+
+  private buildWhere(query: FlightSearchParams): Prisma.FlightWhereInput {
+    const airport = (code?: string, destinationId?: string) =>
+      code || destinationId
+        ? {
+            code: code
+              ? { equals: code, mode: 'insensitive' as const }
+              : undefined,
+            destinationId,
+          }
+        : undefined;
+
+    const now = new Date();
+    const day = query.date ? toDateOnly(query.date) : undefined;
+
+    return {
+      departureAirport: airport(query.from, query.fromDestinationId),
+      arrivalAirport: airport(query.to, query.toDestinationId),
+      departureAt: {
+        gt: now,
+        gte: day,
+        lt: day ? addDays(day, 1) : undefined,
+      },
+      availableSeats: query.passengers ? { gte: query.passengers } : undefined,
+      price: query.maxPrice !== undefined ? { lte: query.maxPrice } : undefined,
+      currency: query.currency
+        ? { equals: query.currency, mode: 'insensitive' }
+        : undefined,
+    };
   }
 
   async update(id: string, dto: UpdateFlightDto) {

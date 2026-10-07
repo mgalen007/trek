@@ -102,6 +102,39 @@ describe('InventoryService', () => {
     });
   });
 
+  describe('availableRoomsByHotel', () => {
+    it('computes each hotel from one query, keeping their stays apart', async () => {
+      db.itineraryHotel.findMany.mockResolvedValue([
+        { hotelId: 'a', ...stay(1, 3, 2) },
+        { hotelId: 'b', ...stay(2, 4, 1) },
+        { hotelId: 'a', ...stay(2, 5, 1) },
+      ]);
+
+      const available = await service.availableRoomsByHotel(
+        [
+          { id: 'a', totalRooms: 4 },
+          { id: 'b', totalRooms: 1 },
+          { id: 'c', totalRooms: 3 },
+        ],
+        d(1),
+        d(5),
+      );
+
+      expect(db.itineraryHotel.findMany).toHaveBeenCalledTimes(1);
+      const [{ where }] = db.itineraryHotel.findMany.mock.calls[0] as [
+        { where: { hotelId: unknown } },
+      ];
+      expect(where.hotelId).toEqual({ in: ['a', 'b', 'c'] });
+      expect(available).toEqual(
+        new Map([
+          ['a', 1],
+          ['b', 0],
+          ['c', 3],
+        ]),
+      );
+    });
+  });
+
   describe('reserveFlightSeats', () => {
     it('decrements only when enough seats are left', async () => {
       db.flight.updateMany.mockResolvedValue({ count: 1 });

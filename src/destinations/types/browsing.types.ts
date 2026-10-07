@@ -1,17 +1,18 @@
-import { IsString, IsInt, IsOptional, Min } from 'class-validator';
+import { IsString, IsOptional, MinLength } from 'class-validator';
+import { PaginationQueryParams } from 'common/types/pagination.types';
 
-export class BrowsingQueryParams {
+export class BrowsingQueryParams extends PaginationQueryParams {
+  // Free text matched against name, city and country.
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  q?: string;
+
   @IsOptional()
   @IsString()
   name?: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  limit?: number;
+  @IsString()
+  country?: string;
 }

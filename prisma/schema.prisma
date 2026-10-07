@@ -74,6 +74,7 @@ model Hotel {
   destination Destination @relation(fields: [destinationId], references: [id])
   itineraryHotels ItineraryHotel[]
 
+  @@index([destinationId])
   @@map("hotels")
 }
 
@@ -89,6 +90,7 @@ model Airport {
   departingFlights Flight[] @relation("DepartingFlights")
   arrivingFlights Flight[] @relation("ArrivingFlights")
 
+  @@index([destinationId])
   @@map("airports")
 }
 
@@ -110,6 +112,9 @@ model Flight {
   arrivalAirport Airport @relation("ArrivingFlights", fields: [arrivalAirportId], references: [id])
   itineraryFlight ItineraryFlight[]
 
+  @@index([departureAirportId, departureAt])
+  @@index([arrivalAirportId, departureAt])
+  @@index([departureAt])
   @@map("flights")
 }
 

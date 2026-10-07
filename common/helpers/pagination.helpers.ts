@@ -1,8 +1,13 @@
 const DEFAULT_LIMIT = 15;
 
-export const paginationMetadata = (skip: number, limit: number) => {
+export const paginationMetadata = (
+  skip: number,
+  limit: number,
+  total: number,
+) => {
   const page = skip / limit + 1;
-  return { page, skip, limit };
+  const totalPages = Math.ceil(total / limit);
+  return { page, skip, limit, total, totalPages };
 };
 
 export const getPaginationParams = (page?: number, limit?: number) => {

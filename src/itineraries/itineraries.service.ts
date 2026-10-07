@@ -18,6 +18,7 @@ import {
   getPaginationParams,
   paginationMetadata,
 } from 'common/helpers/pagination.helpers';
+import { DAY_MS, toDateOnly } from 'common/helpers/date.helpers';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
@@ -26,12 +27,7 @@ import { ItineraryQueryParams } from './types/itinerary-query.types';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_TX_ATTEMPTS = 3;
-
-// Itinerary and hotel dates are calendar days, stored as UTC midnight.
-const toDateOnly = (d: Date) =>
-  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 const nightsBetween = (checkIn: Date, checkOut: Date) =>
   Math.round((checkOut.getTime() - checkIn.getTime()) / DAY_MS);
@@ -97,15 +93,19 @@ export class ItinerariesService {
 
   async findAll(currentUser: ICurrentUser, query: ItineraryQueryParams) {
     const { skip, l: limit } = getPaginationParams(query.page, query.limit);
-    const itineraries = await this.prisma.itinerary.findMany({
-      where: { userId: currentUser.id, status: query.status },
-      include: { destination: true },
-      orderBy: { startDate: 'asc' },
-      take: limit,
-      skip,
-    });
+    const where = { userId: currentUser.id, status: query.status };
+    const [itineraries, total] = await this.prisma.$transaction([
+      this.prisma.itinerary.findMany({
+        where,
+        include: { destination: true },
+        orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+        take: limit,
+        skip,
+      }),
+      this.prisma.itinerary.count({ where }),
+    ]);
 
-    return { itineraries, pagination: paginationMetadata(skip, limit) };
+    return { itineraries, pagination: paginationMetadata(skip, limit, total) };
   }
 
   async findOne(id: string, currentUser: ICurrentUser) {
