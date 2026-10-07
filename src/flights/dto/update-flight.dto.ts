@@ -1,14 +1,12 @@
-import { IsString, MinLength, IsNumber, IsDate, Min, IsOptional } from 'class-validator'
+import { IsString, IsUUID, IsInt, MinLength, IsNumber, IsDate, Min, IsOptional } from 'class-validator'
 
 export class UpdateFlightDto {
   @IsOptional()
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   departureAirportId?: string
 
   @IsOptional()
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   arrivalAirportId?: string
 
   @IsOptional()
@@ -40,7 +38,7 @@ export class UpdateFlightDto {
   currency?: string
 
   @IsOptional()
-  @IsNumber()
-  @Min(6)
+  @IsInt()
+  @Min(0)
   availableSeats?: number
 }

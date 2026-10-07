@@ -1,5 +1,6 @@
 import {
   ArgumentsHost,
+  BadRequestException,
   Catch,
   ConflictException,
   HttpException,
@@ -23,6 +24,14 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
         break;
       case 'P2002':
         mapped = new ConflictException(`${model} already exists`);
+        break;
+      case 'P2003':
+        mapped = new BadRequestException('Referenced record does not exist');
+        break;
+      case 'P2034':
+        mapped = new ConflictException(
+          'Booking conflicted with another request, please retry',
+        );
         break;
     }
 

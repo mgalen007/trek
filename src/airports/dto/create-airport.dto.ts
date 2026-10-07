@@ -1,8 +1,7 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateAirportDto {
-  @IsString()
-  @MinLength(32)
+  @IsUUID()
   destinationId: string;
 
   @IsString()
