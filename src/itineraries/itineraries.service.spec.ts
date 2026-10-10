@@ -6,6 +6,7 @@ import {
 import { ItinerariesService } from './itineraries.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { TravelersService } from '../travelers/travelers.service';
 import { Prisma } from '../../generated/prisma/client';
 import { Role } from '../auth/types/auth.types';
 import type { ICurrentUser } from '../auth/types/user.types';
@@ -53,6 +54,7 @@ describe('ItinerariesService', () => {
     service = new ItinerariesService(
       prisma as unknown as PrismaService,
       inventory as unknown as InventoryService,
+      {} as TravelersService,
     );
   });
 

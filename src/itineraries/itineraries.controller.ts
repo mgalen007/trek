@@ -32,6 +32,7 @@ import {
   ApiErrorResponses,
   ApiPageResponse,
 } from 'common/http/api-response.decorators';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 const NOT_DRAFT = 'Itinerary is not a DRAFT (INVALID_STATUS)';
 
@@ -44,6 +45,7 @@ export class ItinerariesController {
   constructor(private itinerariesService: ItinerariesService) {}
 
   @Post()
+  @Idempotent()
   @ApiOperation({
     summary: 'Start a draft itinerary',
     description:
@@ -132,6 +134,7 @@ export class ItinerariesController {
   }
 
   @Post(':id/hotels')
+  @Idempotent()
   @ApiOperation({
     summary: 'Add a hotel stay to a draft',
     description:
@@ -180,6 +183,7 @@ export class ItinerariesController {
   }
 
   @Post(':id/flights')
+  @Idempotent()
   @ApiOperation({
     summary: 'Add a flight to a draft',
     description:
@@ -189,6 +193,8 @@ export class ItinerariesController {
   @ApiErrorResponses(
     [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
     {
+      [HttpStatus.BAD_REQUEST]:
+        "Invalid input, passengers not matching travelerIds, or someone else's traveler (INVALID_REFERENCE)",
       [HttpStatus.CONFLICT]: `Not enough seats (SEATS_UNAVAILABLE), or ${NOT_DRAFT}`,
     },
   )
@@ -228,6 +234,7 @@ export class ItinerariesController {
   }
 
   @Post(':id/confirm')
+  @Idempotent()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Confirm a draft, reserving everything',
@@ -251,6 +258,7 @@ export class ItinerariesController {
   }
 
   @Post(':id/cancel')
+  @Idempotent()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cancel a planned itinerary, releasing everything',

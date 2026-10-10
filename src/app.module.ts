@@ -11,6 +11,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { SeedService } from './scripts/seed';
 import { FlightsModule } from './flights/flights.module';
+import { PreferencesModule } from './preferences/preferences.module';
+import { TravelersModule } from './travelers/travelers.module';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { FlightsModule } from './flights/flights.module';
     PrismaModule,
     AuthModule,
     FlightsModule,
+    PreferencesModule,
+    TravelersModule,
+    IdempotencyModule,
   ],
   controllers: [AppController],
   providers: [AppService, SeedService],

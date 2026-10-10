@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { TravelersService } from '../travelers/travelers.service';
 import {
   BookingStatus,
   ItineraryStatus,
@@ -54,6 +55,7 @@ const DETAIL_INCLUDE = {
   itineraryFlight: {
     include: {
       flight: { include: { departureAirport: true, arrivalAirport: true } },
+      travelers: { orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] },
     },
     orderBy: { flight: { departureAt: 'asc' } },
   },
@@ -64,6 +66,7 @@ export class ItinerariesService {
   constructor(
     private prisma: PrismaService,
     private inventory: InventoryService,
+    private travelers: TravelersService,
   ) {}
 
   async create(dto: CreateItineraryDto, currentUser: ICurrentUser) {
@@ -228,6 +231,18 @@ export class ItinerariesService {
     const itinerary = await this.getOwnedOrFail(id, currentUser);
     this.assertStatus(itinerary, ItineraryStatus.DRAFT);
 
+    const travelerIds = dto.travelerIds ?? [];
+    const passengers = dto.passengers ?? travelerIds.length;
+    if (!passengers)
+      throw new BadRequestException('Give passengers or travelerIds');
+    if (travelerIds.length && passengers !== travelerIds.length)
+      throw new BadRequestException(
+        `passengers (${passengers}) must match the number of travelerIds (${travelerIds.length})`,
+      );
+    // Travelers belong to the itinerary's owner, even when an admin books.
+    if (travelerIds.length)
+      await this.travelers.assertOwnedBy(itinerary.userId, travelerIds);
+
     const flight = await this.prisma.flight.findUnique({
       where: { id: dto.flightId },
     });
@@ -236,7 +251,7 @@ export class ItinerariesService {
       throw new BadRequestException('Flight has already departed');
     if (!this.flightFits(itinerary, flight.departureAt))
       throw new BadRequestException('Flight must depart within the trip dates');
-    if (dto.passengers > flight.availableSeats)
+    if (passengers > flight.availableSeats)
       throw new ConflictException(
         apiError(
           ErrorCode.SEATS_UNAVAILABLE,
@@ -248,10 +263,13 @@ export class ItinerariesService {
       data: {
         itineraryId: id,
         flightId: flight.id,
-        passengers: dto.passengers,
+        passengers,
         unitPrice: flight.price,
-        totalPrice: flight.price.mul(dto.passengers),
+        totalPrice: flight.price.mul(passengers),
         currency: flight.currency,
+        travelers: {
+          connect: travelerIds.map((travelerId) => ({ id: travelerId })),
+        },
       },
     });
 

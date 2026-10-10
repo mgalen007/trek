@@ -6,6 +6,7 @@ import {
 import { DestinationEntity } from '../../destinations/entities/destination.entity';
 import { HotelEntity } from '../../hotels/entities/hotel.entity';
 import { FlightWithAirportsEntity } from '../../flights/entities/flight.entity';
+import { TravelerEntity } from '../../travelers/entities/traveler.entity';
 
 export class ItineraryEntity {
   id: string;
@@ -73,6 +74,8 @@ export class ItineraryFlightEntity {
   totalPrice: string;
   currency: string;
   flight: FlightWithAirportsEntity;
+  /** Named passengers, when travelerIds were given. */
+  travelers: TravelerEntity[];
   createdAt: Date;
   updatedAt: Date;
 }
