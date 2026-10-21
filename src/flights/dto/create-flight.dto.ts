@@ -37,7 +37,11 @@ export class CreateFlightDto {
   @MinLength(3)
   currency: string;
 
+  /**
+   * Seat capacity. Seats left (`availableSeats`) are derived from it and
+   * follow when it changes; it can't go below the seats already booked.
+   */
   @IsInt()
   @Min(0)
-  availableSeats: number;
+  totalSeats: number;
 }

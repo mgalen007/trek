@@ -102,6 +102,33 @@ describe('InventoryService', () => {
     });
   });
 
+  describe('peakUpcomingHotelRooms', () => {
+    it('only counts confirmed stays that have not ended', async () => {
+      db.itineraryHotel.findMany.mockResolvedValue([]);
+
+      await service.peakUpcomingHotelRooms('h');
+
+      const [{ where }] = db.itineraryHotel.findMany.mock.calls[0] as [
+        { where: { status: string; checkOutDate: { gt: Date } } },
+      ];
+      expect(where.status).toBe('CONFIRMED');
+      expect(where.checkOutDate.gt.getUTCHours()).toBe(0);
+    });
+
+    it('returns the busiest night', async () => {
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const inDays = (n: number) => new Date(today.getTime() + n * 86_400_000);
+      db.itineraryHotel.findMany.mockResolvedValue([
+        { checkInDate: inDays(-2), checkOutDate: inDays(3), rooms: 1 },
+        { checkInDate: inDays(5), checkOutDate: inDays(8), rooms: 2 },
+        { checkInDate: inDays(6), checkOutDate: inDays(7), rooms: 1 },
+      ]);
+
+      await expect(service.peakUpcomingHotelRooms('h')).resolves.toBe(3);
+    });
+  });
+
   describe('availableRoomsByHotel', () => {
     it('computes each hotel from one query, keeping their stays apart', async () => {
       db.itineraryHotel.findMany.mockResolvedValue([

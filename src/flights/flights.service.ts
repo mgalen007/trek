@@ -1,9 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { InventoryService } from '../inventory/inventory.service';
+import { apiError, ErrorCode } from 'common/http/api-error';
+import { assertNotInUse } from 'common/http/in-use';
 import { UpdateFlightDto } from './dto/update-flight.dto';
 import { CreateFlightDto } from './dto/create-flight.dto';
 import { Prisma } from '../../generated/prisma/client';
@@ -19,7 +23,10 @@ const AIRPORTS_INCLUDE = {
 
 @Injectable()
 export class FlightsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private inventory: InventoryService,
+  ) {}
 
   private validateRoute(
     flight: Pick<
@@ -37,7 +44,9 @@ export class FlightsService {
 
   async create(dto: CreateFlightDto) {
     this.validateRoute(dto);
-    const flight = await this.prisma.flight.create({ data: dto });
+    const flight = await this.prisma.flight.create({
+      data: { ...dto, availableSeats: dto.totalSeats },
+    });
 
     return flight;
   }
@@ -116,15 +125,35 @@ export class FlightsService {
       arrivalAt: dto.arrivalAt ?? existing.arrivalAt,
     });
 
-    const flight = await this.prisma.flight.update({
-      where: { id },
-      data: dto,
-    });
+    // Capacity goes through InventoryService so availableSeats moves with it;
+    // everything else is a plain update. Both or neither apply.
+    const { totalSeats, ...fields } = dto;
+    return this.prisma.$transaction(async (tx) => {
+      if (
+        totalSeats !== undefined &&
+        !(await this.inventory.setFlightCapacity(id, totalSeats, tx))
+      )
+        throw new ConflictException(
+          apiError(
+            ErrorCode.CAPACITY_BELOW_BOOKINGS,
+            `${existing.totalSeats - existing.availableSeats} seat(s) are already booked on this flight`,
+            { booked: existing.totalSeats - existing.availableSeats },
+          ),
+        );
 
-    return flight;
+      return tx.flight.update({ where: { id }, data: fields });
+    });
   }
 
+  // Flights with bookings (past, held or confirmed) are kept for the record.
   async remove(id: string) {
+    await this.findOneById(id);
+    assertNotInUse('Flight', {
+      bookings: await this.prisma.itineraryFlight.count({
+        where: { flightId: id },
+      }),
+    });
+
     const flight = await this.prisma.flight.delete({ where: { id } });
 
     return flight;

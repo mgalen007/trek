@@ -79,7 +79,13 @@ export class FlightsController {
   @Put(':id')
   @ApiOperation({ summary: 'Update a flight (admin)' })
   @ApiDataResponse(FlightEntity)
-  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    {
+      [HttpStatus.CONFLICT]:
+        'New capacity is below what is already booked (CAPACITY_BELOW_BOOKINGS)',
+    },
+  )
   async update(@Param('id') id: string, @Body() dto: UpdateFlightDto) {
     const flight = await this.flightService.update(id, dto);
 
@@ -90,7 +96,10 @@ export class FlightsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a flight (admin)' })
   @ApiDataResponse(FlightEntity)
-  @ApiErrorResponses([HttpStatus.NOT_FOUND])
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]:
+      'Still referenced by other records; counts in details (RESOURCE_IN_USE)',
+  })
   async remove(@Param('id') id: string) {
     const flight = await this.flightService.remove(id);
 

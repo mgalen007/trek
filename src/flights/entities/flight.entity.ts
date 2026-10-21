@@ -12,6 +12,9 @@ export class FlightEntity {
   price: string;
   /** ISO 4217 currency code. */
   currency: string;
+  /** Seat capacity. */
+  totalSeats: number;
+  /** Seats not yet taken by confirmed bookings. */
   availableSeats: number;
   createdAt: Date;
   updatedAt: Date;

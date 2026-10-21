@@ -73,7 +73,13 @@ export class HotelsController {
   @Put(':id')
   @ApiOperation({ summary: 'Update a hotel (admin)' })
   @ApiDataResponse(HotelEntity)
-  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    {
+      [HttpStatus.CONFLICT]:
+        'New capacity is below what is already booked (CAPACITY_BELOW_BOOKINGS)',
+    },
+  )
   async update(@Param('id') id: string, @Body() dto: UpdateHotelDto) {
     const hotel = await this.hotelsService.update(id, dto);
 
@@ -84,7 +90,10 @@ export class HotelsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a hotel (admin)' })
   @ApiDataResponse(HotelEntity)
-  @ApiErrorResponses([HttpStatus.NOT_FOUND])
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]:
+      'Still referenced by other records; counts in details (RESOURCE_IN_USE)',
+  })
   async remove(@Param('id') id: string) {
     const hotel = await this.hotelsService.remove(id);
 

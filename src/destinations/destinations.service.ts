@@ -5,6 +5,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { BrowsingQueryParams } from './types/browsing.types';
 import { getPaginationParams } from 'common/helpers/pagination.helpers';
 import { toPage } from 'common/http/page';
+import { assertNotInUse } from 'common/http/in-use';
 import { UpdateDestinationDto } from './dto/update-destination.dto';
 
 @Injectable()
@@ -69,6 +70,15 @@ export class DestinationsService {
   }
 
   async remove(id: string) {
+    await this.findOneById(id);
+    const where = { destinationId: id };
+    const [hotels, airports, itineraries] = await this.prisma.$transaction([
+      this.prisma.hotel.count({ where }),
+      this.prisma.airport.count({ where }),
+      this.prisma.itinerary.count({ where }),
+    ]);
+    assertNotInUse('Destination', { hotels, airports, itineraries });
+
     const destination = await this.prisma.destination.delete({ where: { id } });
 
     return destination;
