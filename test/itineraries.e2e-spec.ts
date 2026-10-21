@@ -85,7 +85,7 @@ describe('Itineraries (e2e)', () => {
       arrivalAt: `${day(30)}T10:00:00.000Z`,
       price: 250,
       currency: 'USD',
-      availableSeats: 3,
+      totalSeats: 3,
     });
     hotelId = await adminPost('/api/hotels', {
       destinationId: kigaliId,

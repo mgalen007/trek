@@ -71,7 +71,7 @@ describe('Preferences & travelers (e2e)', () => {
       arrivalAt: `${day(30)}T10:00:00Z`,
       price: 100,
       currency: 'USD',
-      availableSeats: 5,
+      totalSeats: 5,
     });
   });
 

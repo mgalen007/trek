@@ -98,7 +98,7 @@ describe('Search & discovery (e2e)', () => {
       to: string,
       departureAt: string,
       price: number,
-      availableSeats: number,
+      totalSeats: number,
     ) =>
       adminPost('/api/flights', {
         departureAirportId: from,
@@ -111,7 +111,7 @@ describe('Search & discovery (e2e)', () => {
         ).toISOString(),
         price,
         currency: 'USD',
-        availableSeats,
+        totalSeats,
       });
     await flight('WB101', nbo, kgl, `${day(30)}T08:00:00Z`, 250, 3);
     await flight('KQ200', nbo, kgl, `${day(30)}T18:00:00Z`, 180, 1);
