@@ -1,9 +1,12 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ItineraryStatus } from '../../generated/prisma/client';
+import { apiError, ErrorCode } from 'common/http/api-error';
+import { toDateOnly } from 'common/helpers/date.helpers';
 import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from '../auth/dto/register.dto';
 import type { ICurrentUser } from '../auth/types/user.types';
@@ -40,10 +43,27 @@ export class UsersService {
     return user;
   }
 
+  // Deleting a user deletes their itineraries, travelers and preferences.
+  // Upcoming confirmed trips would lose their reserved rooms and seats, so
+  // those must be cancelled first.
   async remove(id: string, currentUser: ICurrentUser) {
-    if (!(currentUser.role === Role.ADMIN) && currentUser.id !== id) {
-      throw new ForbiddenException();
-    }
+    await this.getAccessibleOrFail(id, currentUser);
+
+    const activeTrips = await this.prisma.itinerary.count({
+      where: {
+        userId: id,
+        status: ItineraryStatus.PLANNED,
+        endDate: { gte: toDateOnly(new Date()) },
+      },
+    });
+    if (activeTrips)
+      throw new ConflictException(
+        apiError(
+          ErrorCode.HAS_ACTIVE_BOOKINGS,
+          `User has ${activeTrips} upcoming confirmed itinerary(ies); cancel them first`,
+        ),
+      );
+
     const user = await this.prisma.user.delete({
       where: { id },
       omit: { passwordHash: true },
@@ -53,8 +73,7 @@ export class UsersService {
   }
 
   async update(id: string, currentUser: ICurrentUser, newUser: UpdateUserDto) {
-    if (currentUser.id !== id && currentUser.role !== Role.ADMIN)
-      throw new ForbiddenException();
+    await this.getAccessibleOrFail(id, currentUser);
 
     const user = await this.prisma.user.update({
       where: { id },
@@ -80,7 +99,16 @@ export class UsersService {
     return users;
   }
 
-  async findOneById(id: string) {
+  async findOneById(id: string, currentUser: ICurrentUser) {
+    return this.getAccessibleOrFail(id, currentUser);
+  }
+
+  // Users can only see and change themselves (admins: anyone). Other users
+  // are reported as missing rather than forbidden, so ids can't be probed.
+  private async getAccessibleOrFail(id: string, currentUser: ICurrentUser) {
+    if (currentUser.id !== id && currentUser.role !== Role.ADMIN)
+      throw new NotFoundException('User not found');
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       omit: { passwordHash: true },

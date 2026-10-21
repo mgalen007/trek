@@ -30,11 +30,18 @@ export class UsersController {
   constructor(private usersService: UsersService) {}
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a user by id' })
+  @ApiOperation({
+    summary: 'Get a user by id',
+    description:
+      'Users can only read themselves (admins: anyone); other users are reported as not found.',
+  })
   @ApiDataResponse(UserEntity)
   @ApiErrorResponses([HttpStatus.NOT_FOUND])
-  async findById(@Param('id') id: string) {
-    const user = await this.usersService.findOneById(id);
+  async findById(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: ICurrentUser,
+  ) {
+    const user = await this.usersService.findOneById(id, currentUser);
 
     return user;
   }
@@ -52,15 +59,14 @@ export class UsersController {
   @Put(':id')
   @ApiOperation({
     summary: 'Update a user',
-    description: 'Users can update themselves; admins can update anyone.',
+    description:
+      'Users can update themselves (admins: anyone); other users are reported as not found.',
   })
   @ApiDataResponse(UserEntity)
-  @ApiErrorResponses([
-    HttpStatus.BAD_REQUEST,
-    HttpStatus.FORBIDDEN,
-    HttpStatus.NOT_FOUND,
-    HttpStatus.CONFLICT,
-  ])
+  @ApiErrorResponses(
+    [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
+    { [HttpStatus.CONFLICT]: 'Email already registered (ALREADY_EXISTS)' },
+  )
   async update(
     @Param('id') id: string,
     @CurrentUser() currentUser: ICurrentUser,
@@ -74,10 +80,14 @@ export class UsersController {
   @Delete(':id')
   @ApiOperation({
     summary: 'Delete a user',
-    description: 'Users can delete themselves; admins can delete anyone.',
+    description:
+      "Users can delete themselves (admins: anyone). Also deletes the user's itineraries, travelers and preferences; upcoming confirmed itineraries must be cancelled first.",
   })
   @ApiDataResponse(UserEntity)
-  @ApiErrorResponses([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND])
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]:
+      'Upcoming confirmed itineraries exist (HAS_ACTIVE_BOOKINGS)',
+  })
   async remove(
     @Param('id') id: string,
     @CurrentUser() currentUser: ICurrentUser,
