@@ -24,7 +24,12 @@ type OpenApiDoc = {
   components: { schemas: Record<string, Schema> };
 };
 
-const PUBLIC_OPERATIONS = ['auth_login', 'auth_register'];
+const PUBLIC_OPERATIONS = [
+  'auth_login',
+  'auth_register',
+  'auth_refresh',
+  'auth_logout',
+];
 
 describe('OpenAPI docs (e2e)', () => {
   let ctx: Awaited<ReturnType<typeof createTestApp>>;
@@ -70,7 +75,7 @@ describe('OpenAPI docs (e2e)', () => {
     }
   });
 
-  it('requires a bearer token everywhere except login and register', () => {
+  it('requires a bearer token everywhere except login, register, refresh and logout', () => {
     for (const o of operations) {
       const isPublic = PUBLIC_OPERATIONS.includes(o.operationId);
       expect([o.operationId, Boolean(o.security)]).toEqual([

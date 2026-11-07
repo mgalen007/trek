@@ -7,6 +7,7 @@ import { UsersModule } from '../users/users.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RefreshTokensService } from './refresh-tokens.service';
 
 @Module({
   imports: [
@@ -15,9 +16,11 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
+        // Short-lived: access tokens are checked without a database lookup,
+        // so logging out only stops them once they expire.
         signOptions: {
           expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ??
-            '1d') as JwtSignOptions['expiresIn'],
+            '15m') as JwtSignOptions['expiresIn'],
         },
       }),
     }),
@@ -25,7 +28,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     PassportModule,
     UsersModule,
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, RefreshTokensService, JwtStrategy],
   controllers: [AuthController],
 })
 export class AuthModule {}

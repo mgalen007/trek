@@ -40,8 +40,30 @@ model User {
   preferences UserPreferences?
   travelers Traveler[]
   idempotencyKeys IdempotencyKey[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
+}
+
+// Refresh tokens, stored as SHA-256 hashes. Each login starts a family (one
+// session); every refresh marks the presented token used and issues the next
+// one in the same family. A used token presented again, outside a short
+// retry window, revokes the whole family.
+model RefreshToken {
+  id String @id @default(uuid())
+  userId String
+  familyId String
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 // Successful responses to POST requests sent with an Idempotency-Key, so

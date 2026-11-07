@@ -35,7 +35,7 @@ CI (`.github/workflows/ci.yml`) runs lint:check → typecheck → build → Open
 
 ### Environment
 
-`.env` (gitignored) needs: `PORT`, `DATABASE_URL`, `MAX_DB_CONNECTIONS`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `BCRYPT_SALT_ROUNDS`, and `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_FIRST_NAME` / `SEED_ADMIN_LAST_NAME`. `SeedService` (`src/scripts/seed.ts`) creates that admin on boot if no admin exists — there is no separate seed command.
+`.env` (gitignored) needs: `PORT`, `DATABASE_URL`, `MAX_DB_CONNECTIONS`, `JWT_SECRET`, `JWT_EXPIRES_IN` (access token lifetime, default `15m`), `REFRESH_TOKEN_TTL_DAYS` (optional, default 30), `BCRYPT_SALT_ROUNDS`, and `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_FIRST_NAME` / `SEED_ADMIN_LAST_NAME`. `SeedService` (`src/scripts/seed.ts`) creates that admin on boot if no admin exists — there is no separate seed command.
 
 ### E2E test database
 
@@ -65,6 +65,8 @@ Clients and the agent branch on `error.code`, never on messages. Codes live in `
 ### Auth
 
 JWT bearer tokens (passport-jwt, bcryptjs). Roles: `USER`, `ADMIN`. Controllers apply `@UseGuards(JwtAuthGuard)` at class level; `@AdminOnly()` (`src/auth/decorators/`) adds the role guard and documents the 403 — it requires `JwtAuthGuard` to already apply. `@CurrentUser()` injects `{ id, email, role }`. Catalogue writes (destinations, hotels, airports, flights) are admin-only; user profiles, itineraries, travelers and preferences are scoped to the current user (admins can reach any user's), and other users' records are reported as **404, not 403**. Catalogue records still in use can't be deleted (409 `RESOURCE_IN_USE` via `assertNotInUse()` in `common/http/in-use.ts`), and capacity can't drop below what is booked (409 `CAPACITY_BELOW_BOOKINGS`).
+
+**Sessions** (`RefreshTokensService`): login returns a short-lived access token (checked without a DB lookup, so it stays valid until it expires) and a refresh token, stored only as a SHA-256 hash. Each login is a token family; `POST /auth/refresh` spends the token and issues its successor, re-reading the user so role changes apply. A spent token presented again within 30s (`REUSE_GRACE_MS`) is treated as a retry and gets another successor; later, it revokes the whole family (401 `REFRESH_TOKEN_REUSED`). `logout` revokes one family, `logout-all` every family of the user; deleting a user cascades to their tokens.
 
 ### Domain
 
@@ -99,8 +101,8 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
   2. OpenAPI at `/api/docs` — done
   3. User preferences + travelers — done
   4. Idempotency-Key on POST mutations — done
-  5. **Refresh tokens** — next
-  6. Booking activity log
-- **Phase 4 — production hardening:** Docker, rate limiting (`TOO_MANY_REQUESTS` is already reserved), helmet, health checks, scheduled jobs (e.g. purging expired idempotency keys, completing past itineraries), emails.
+  5. Refresh tokens — done
+  6. **Booking activity log** — next
+- **Phase 4 — production hardening:** Docker, rate limiting (`TOO_MANY_REQUESTS` is already reserved), helmet, health checks, scheduled jobs (e.g. purging expired idempotency keys and refresh tokens, completing past itineraries), emails.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
 - **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.

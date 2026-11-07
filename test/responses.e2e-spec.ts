@@ -42,14 +42,14 @@ describe('Response format (e2e)', () => {
       });
     });
 
-    it('returns the token as data on login', async () => {
+    it('returns the tokens as data on login', async () => {
       const res = await ctx
         .api()
         .post('/api/auth/login')
         .send({ email: 'user@trek.test', password: PASSWORD })
         .expect(200);
 
-      expect(typeof res.body.data.token).toBe('string');
+      expect(typeof res.body.data.accessToken).toBe('string');
     });
   });
 
