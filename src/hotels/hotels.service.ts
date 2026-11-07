@@ -1,8 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { apiError, ErrorCode } from 'common/http/api-error';
+import { assertNotInUse } from 'common/http/in-use';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -85,6 +88,19 @@ export class HotelsService {
   }
 
   async update(id: string, dto: UpdateHotelDto) {
+    if (dto.totalRooms !== undefined) {
+      await this.findOneById(id);
+      const booked = await this.inventory.peakUpcomingHotelRooms(id);
+      if (dto.totalRooms < booked)
+        throw new ConflictException(
+          apiError(
+            ErrorCode.CAPACITY_BELOW_BOOKINGS,
+            `${booked} room(s) are already booked on this hotel's busiest upcoming night`,
+            { booked },
+          ),
+        );
+    }
+
     const hotel = await this.prisma.hotel.update({
       where: { id },
       data: dto,
@@ -93,7 +109,15 @@ export class HotelsService {
     return hotel;
   }
 
+  // Hotels with stays (past, held or confirmed) are kept for the record.
   async remove(id: string) {
+    await this.findOneById(id);
+    assertNotInUse('Hotel', {
+      bookings: await this.prisma.itineraryHotel.count({
+        where: { hotelId: id },
+      }),
+    });
+
     const hotel = await this.prisma.hotel.delete({ where: { id } });
 
     return hotel;

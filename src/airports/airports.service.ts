@@ -5,6 +5,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { AirportQueryParams } from './types/airport-query.types';
 import { getPaginationParams } from 'common/helpers/pagination.helpers';
 import { toPage } from 'common/http/page';
+import { assertNotInUse } from 'common/http/in-use';
 import { UpdateAirportDto } from './dto/update-airport.dto';
 
 @Injectable()
@@ -54,7 +55,18 @@ export class AirportsService {
     return airport;
   }
 
+  // Users' home airport preferences are cleared automatically (SetNull);
+  // flights are not.
   async remove(id: string) {
+    await this.findOneById(id);
+    assertNotInUse('Airport', {
+      flights: await this.prisma.flight.count({
+        where: {
+          OR: [{ departureAirportId: id }, { arrivalAirportId: id }],
+        },
+      }),
+    });
+
     const airport = await this.prisma.airport.delete({ where: { id } });
 
     return airport;

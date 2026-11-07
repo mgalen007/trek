@@ -86,7 +86,10 @@ export class AirportsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete an airport (admin)' })
   @ApiDataResponse(AirportEntity)
-  @ApiErrorResponses([HttpStatus.NOT_FOUND])
+  @ApiErrorResponses([HttpStatus.NOT_FOUND, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]:
+      'Still referenced by other records; counts in details (RESOURCE_IN_USE)',
+  })
   async remove(@Param('id') id: string) {
     const airport = await this.airportService.remove(id);
 

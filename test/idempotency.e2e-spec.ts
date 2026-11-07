@@ -71,7 +71,7 @@ describe('Idempotency keys (e2e)', () => {
       arrivalAt: `${day(30)}T10:00:00Z`,
       price: 100,
       currency: 'USD',
-      availableSeats: 10,
+      totalSeats: 10,
     });
   });
 

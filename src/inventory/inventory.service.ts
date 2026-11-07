@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingStatus, Prisma } from '../../generated/prisma/client';
+import { toDateOnly } from 'common/helpers/date.helpers';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -57,6 +58,22 @@ export class InventoryService {
     });
 
     return peakRooms(stays, checkIn);
+  }
+
+  // Most rooms held by CONFIRMED stays on any night from today on; a hotel's
+  // totalRooms can't go below this.
+  async peakUpcomingHotelRooms(hotelId: string, db: Db = this.prisma) {
+    const today = toDateOnly(new Date());
+    const stays = await db.itineraryHotel.findMany({
+      where: {
+        hotelId,
+        status: BookingStatus.CONFIRMED,
+        checkOutDate: { gt: today },
+      },
+      select: { checkInDate: true, checkOutDate: true, rooms: true },
+    });
+
+    return peakRooms(stays, today);
   }
 
   // Free rooms per hotel for [checkIn, checkOut), using one query for all of
@@ -135,5 +152,25 @@ export class InventoryService {
       where: { id: flightId },
       data: { availableSeats: { increment: seats } },
     });
+  }
+
+  // Changes a flight's capacity and shifts availableSeats by the same amount
+  // in one statement (Postgres evaluates SET against the old row), so
+  // concurrent bookings are never lost. Returns false, changing nothing, if
+  // the flight doesn't exist or already has more seats booked than that.
+  async setFlightCapacity(
+    flightId: string,
+    totalSeats: number,
+    db: Db = this.prisma,
+  ) {
+    const updated = await db.$executeRaw`
+      UPDATE "flights"
+      SET "availableSeats" = "availableSeats" + (${totalSeats}::int - "totalSeats"),
+          "totalSeats" = ${totalSeats}::int,
+          "updatedAt" = NOW()
+      WHERE "id" = ${flightId}
+        AND "availableSeats" + (${totalSeats}::int - "totalSeats") >= 0`;
+
+    return updated === 1;
   }
 }

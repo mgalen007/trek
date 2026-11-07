@@ -165,6 +165,9 @@ model Flight {
   arrivalAt DateTime
   price Decimal
   currency String
+  // Capacity, set by admins. availableSeats is the live counter: totalSeats
+  // minus seats held by confirmed bookings.
+  totalSeats Int
   availableSeats Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -190,7 +193,7 @@ model Itinerary {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   destination Destination @relation(fields: [destinationId], references: [id])
   itineraryHotel ItineraryHotel[]
   itineraryFlight ItineraryFlight[]
