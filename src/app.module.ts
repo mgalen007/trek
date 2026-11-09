@@ -14,6 +14,8 @@ import { FlightsModule } from './flights/flights.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { TravelersModule } from './travelers/travelers.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
+import { RateLimitModule } from './rate-limit/rate-limit.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { IdempotencyModule } from './idempotency/idempotency.module';
     PreferencesModule,
     TravelersModule,
     IdempotencyModule,
+    RateLimitModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService, SeedService],

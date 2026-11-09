@@ -5,6 +5,9 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
+import type { Application } from 'express';
 import { ApiExceptionFilter } from '../common/filters/api-exception.filter';
 import { EnvelopeInterceptor } from '../common/http/envelope.interceptor';
 import { apiError, ErrorCode } from '../common/http/api-error';
@@ -25,8 +28,46 @@ const toFieldErrors = (
     return [...own, ...toFieldErrors(e.children ?? [], field)];
   });
 
+// Express "trust proxy": a hop count ("1"), "true", or a list of addresses.
+// Needed behind a load balancer so rate limits see client IPs, not its own.
+const parseTrustProxy = (value: string) =>
+  /^\d+$/.test(value) ? Number(value) : value === 'true' ? true : value;
+
 // Shared by main.ts and the e2e tests so both run the same pipeline.
 export function configureApp(app: INestApplication) {
+  const config = app.get(ConfigService);
+
+  const trustProxy = config.get<string>('TRUST_PROXY');
+  if (trustProxy)
+    (app.getHttpAdapter().getInstance() as Application).set(
+      'trust proxy',
+      parseTrustProxy(trustProxy),
+    );
+
+  // Helmet's defaults suit Swagger UI too (same-origin scripts, inline
+  // styles). upgrade-insecure-requests is dropped: it breaks the docs page
+  // over plain HTTP, and TLS is the deployment's job.
+  app.use(
+    helmet({
+      contentSecurityPolicy: { directives: { upgradeInsecureRequests: null } },
+    }),
+  );
+
+  // Off unless configured: the agent calls the API server-to-server, CORS is
+  // only for browser frontends.
+  const corsOrigins = config.get<string>('CORS_ORIGINS');
+  if (corsOrigins)
+    app.enableCors({
+      origin: corsOrigins.split(',').map((origin) => origin.trim()),
+      exposedHeaders: [
+        'Idempotent-Replayed',
+        'Retry-After',
+        'X-RateLimit-Limit',
+        'X-RateLimit-Remaining',
+        'X-RateLimit-Reset',
+      ],
+    });
+
   app.setGlobalPrefix('api');
 
   const { httpAdapter } = app.get(HttpAdapterHost);

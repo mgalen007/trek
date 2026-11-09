@@ -1,5 +1,6 @@
-import { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { HttpStatus, INestApplication } from '@nestjs/common';
+import { DocumentBuilder, getSchemaPath, SwaggerModule } from '@nestjs/swagger';
+import { ErrorResponseDto } from '../common/http/api-response.dto';
 
 export const OPENAPI_PATH = 'api/docs';
 
@@ -21,17 +22,41 @@ export function createOpenApiDocument(app: INestApplication) {
         'Successful responses are `{ data }`, or `{ data, pagination }` for lists.',
         'Errors are `{ statusCode, error: { code, message, details? } }`; branch on `error.code`.',
         '',
-        'Authenticate with `POST /api/auth/login` and send the token as `Authorization: Bearer <token>`.',
+        'Authenticate with `POST /api/auth/login` and send `accessToken` as `Authorization: Bearer <token>`; renew it with `POST /api/auth/refresh`.',
+        '',
+        'Requests are rate limited per user (per IP when anonymous). A 429 `TOO_MANY_REQUESTS` carries a `Retry-After` header and `details.retryAfterSeconds`.',
       ].join('\n'),
     )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
 
-  return SwaggerModule.createDocument(app, config, {
+  const document = SwaggerModule.createDocument(app, config, {
     operationIdFactory: operationId,
   });
+
+  // Every route except the health checks can answer 429.
+  for (const [path, item] of Object.entries(document.paths)) {
+    if (path.startsWith('/api/health')) continue;
+    for (const method of HTTP_METHODS) {
+      const operation = item[method];
+      if (!operation) continue;
+      operation.responses[HttpStatus.TOO_MANY_REQUESTS] ??= {
+        description:
+          'Rate limit exceeded; wait `Retry-After` seconds (TOO_MANY_REQUESTS)',
+        content: {
+          'application/json': {
+            schema: { $ref: getSchemaPath(ErrorResponseDto) },
+          },
+        },
+      };
+    }
+  }
+
+  return document;
 }
+
+const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch'] as const;
 
 // Serves Swagger UI at /api/docs and the raw spec at /api/docs-json.
 export function setupOpenApi(app: INestApplication) {
