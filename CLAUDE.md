@@ -37,9 +37,11 @@ CI (`.github/workflows/ci.yml`) runs lint:check → typecheck → build → Open
 
 `.env` (gitignored) needs: `PORT`, `DATABASE_URL`, `MAX_DB_CONNECTIONS`, `JWT_SECRET`, `JWT_EXPIRES_IN` (access token lifetime, default `15m`), `REFRESH_TOKEN_TTL_DAYS` (optional, default 30), `BCRYPT_SALT_ROUNDS`, and `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_FIRST_NAME` / `SEED_ADMIN_LAST_NAME`. `SeedService` (`src/scripts/seed.ts`) creates that admin on boot if no admin exists — there is no separate seed command.
 
+Optional: `RATE_LIMIT_PER_MINUTE` (default 120), `AUTH_RATE_LIMIT_PER_MINUTE` (default 10, login/register), `TRUST_PROXY` (Express "trust proxy" — set it behind a load balancer, or every client shares the balancer's IP for rate limiting), `CORS_ORIGINS` (comma-separated; CORS is off when unset).
+
 ### E2E test database
 
-E2E tests never touch the dev database. They use `TEST_DATABASE_URL`, or `DATABASE_URL` with `_test` appended to the database name (`test/test-db.ts`). Jest's global setup creates that database if missing and runs `prisma migrate deploy`; `createTestApp()` in `test/utils.ts` boots the app through `configureApp()` and truncates tables (refusing any database not ending in `_test`). Tests run serially (`maxWorkers: 1`). **When adding a model, add its table to the TRUNCATE list in `test/utils.ts`.**
+E2E tests never touch the dev database. They use `TEST_DATABASE_URL`, or `DATABASE_URL` with `_test` appended to the database name (`test/test-db.ts`). Jest's global setup creates that database if missing and runs `prisma migrate deploy`; `createTestApp()` in `test/utils.ts` boots the app through `configureApp()` and truncates tables (refusing any database not ending in `_test`). Tests run serially (`maxWorkers: 1`). **When adding a model, add its table to the TRUNCATE list in `test/utils.ts`.** `test/setup-env.ts` raises the rate limits so suites aren't throttled; `test/hardening.e2e-spec.ts` boots its own apps with low limits.
 
 The e2e Jest config runs the `@nestjs/swagger` CLI plugin through `test/swagger-plugin.transformer.js` (options read from `nest-cli.json`), so tests see the same OpenAPI metadata as `nest build`.
 
@@ -47,12 +49,16 @@ The e2e Jest config runs the `@nestjs/swagger` CLI plugin through `test/swagger-
 
 ### Request pipeline (`src/app.setup.ts`)
 
-`configureApp()` is shared by `main.ts` and the e2e tests — put global app configuration there, not in `main.ts`. It sets the `api` global prefix and registers, in order:
+`configureApp()` is shared by `main.ts` and the e2e tests — put global app configuration there, not in `main.ts`. It applies `TRUST_PROXY`, helmet (default CSP minus `upgrade-insecure-requests`, which breaks Swagger UI over HTTP) and optional CORS, sets the `api` global prefix and registers, in order:
 
 1. **`IdempotencyInterceptor`** (outermost) — stores and replays the final enveloped body.
 2. **`EnvelopeInterceptor`** (`common/http/`) — wraps successful responses as `{ data }`, or `{ data, pagination }` when a controller returns a `Page` (build one with `toPage()` from `common/http/page.ts`).
 3. **`ApiExceptionFilter`** (`common/filters/`) — every error leaves as `{ statusCode, error: { code, message, details? } }`. Known Prisma errors are mapped in `prisma-errors.ts` (P2025→404, P2002→409 `ALREADY_EXISTS`, P2003→400 `INVALID_REFERENCE`, P2034→409 `BOOKING_CONFLICT`); anything unexpected becomes a logged 500 `INTERNAL_ERROR`.
 4. **`ValidationPipe`** — whitelist + forbidNonWhitelisted + implicit conversion; failures become `VALIDATION_FAILED` with per-field `details` (dotted paths for nested fields).
+
+**Rate limiting** (`src/rate-limit/`) runs before all of that as a global guard (`RateLimitGuard`, `@nestjs/throttler`). One budget per minute per *user* across the whole API (the bearer token is verified, so forged ids can't mint budgets), per IP when anonymous or the token is invalid — the agent serves many users from one IP. `@StrictRateLimit()` adds the tighter `auth` limit (login, register). A 429 is `TOO_MANY_REQUESTS` with a `Retry-After` header and `details.retryAfterSeconds`; `openapi.ts` documents it on every route. Counters are in memory, per instance — multiple instances need a shared `storage` (e.g. Redis).
+
+**Health** (`src/health/`): `GET /api/health` (liveness, no dependencies) and `GET /api/health/ready` (database within 2s, else 503 `SERVICE_UNAVAILABLE`). Public and exempt from rate limiting.
 
 ### Error codes
 
@@ -98,6 +104,6 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
 - **Phase 1** — itineraries and all-or-nothing bookings. Done.
 - **Phase 2** — search and filtering. Done.
 - **Phase 3 — groundwork for the AI agent.** Done: response envelope + error codes, OpenAPI, user preferences + travelers, Idempotency-Key, refresh tokens, itinerary activity log.
-- **Phase 4 — production hardening** (next): Docker, rate limiting (`TOO_MANY_REQUESTS` is already reserved), helmet, health checks, scheduled jobs (e.g. purging expired idempotency keys and refresh tokens, completing past itineraries), emails.
+- **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting. Next: Docker, scheduled jobs (e.g. purging expired idempotency keys and refresh tokens, completing past itineraries), emails.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
 - **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.

@@ -29,6 +29,8 @@ const PUBLIC_OPERATIONS = [
   'auth_register',
   'auth_refresh',
   'auth_logout',
+  'health_check',
+  'health_ready',
 ];
 
 describe('OpenAPI docs (e2e)', () => {
@@ -75,7 +77,17 @@ describe('OpenAPI docs (e2e)', () => {
     }
   });
 
-  it('requires a bearer token everywhere except login, register, refresh and logout', () => {
+  it('documents 429 everywhere except the health checks', () => {
+    for (const o of operations) {
+      const has429 = Boolean(o.responses['429']);
+      expect([o.operationId, has429]).toEqual([
+        o.operationId,
+        !o.path.startsWith('/api/health'),
+      ]);
+    }
+  });
+
+  it('requires a bearer token everywhere except login, register, refresh, logout and health', () => {
     for (const o of operations) {
       const isPublic = PUBLIC_OPERATIONS.includes(o.operationId);
       expect([o.operationId, Boolean(o.security)]).toEqual([

@@ -30,6 +30,7 @@ import { UserEntity } from '../users/entities/user.entity';
 import { Idempotent } from '../idempotency/idempotent.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { ICurrentUser } from './types/user.types';
+import { StrictRateLimit } from '../rate-limit/strict-rate-limit.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -40,6 +41,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @StrictRateLimit()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Log in',
@@ -100,6 +102,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @StrictRateLimit()
   @ApiOperation({ summary: 'Create an account' })
   @ApiDataResponse(UserEntity, { status: HttpStatus.CREATED })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.CONFLICT], {
