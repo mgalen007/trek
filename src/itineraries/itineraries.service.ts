@@ -9,6 +9,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { TravelersService } from '../travelers/travelers.service';
 import {
   BookingStatus,
+  ItineraryEventType,
   ItineraryStatus,
   Prisma,
 } from '../../generated/prisma/client';
@@ -23,7 +24,20 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
 import { AddFlightDto } from './dto/add-flight.dto';
-import { ItineraryQueryParams } from './types/itinerary-query.types';
+import {
+  ItineraryEventQueryParams,
+  ItineraryQueryParams,
+} from './types/itinerary-query.types';
+import {
+  eventData,
+  flightDetails,
+  recordEvent,
+  stayDetails,
+  totalsByCurrency,
+  tripChanges,
+  tripDetails,
+} from './itinerary-events';
+import { randomUUID } from 'crypto';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -79,13 +93,23 @@ export class ItinerariesService {
     });
     if (!destination) throw new NotFoundException('Destination not found');
 
+    const trip = {
+      name: dto.name,
+      destinationId: dto.destinationId,
+      startDate,
+      endDate,
+    };
     const itinerary = await this.prisma.itinerary.create({
       data: {
-        name: dto.name,
-        destinationId: dto.destinationId,
+        ...trip,
         userId: currentUser.id,
-        startDate,
-        endDate,
+        events: {
+          create: eventData(
+            currentUser,
+            ItineraryEventType.CREATED,
+            tripDetails(trip),
+          ),
+        },
       },
       include: DETAIL_INCLUDE,
     });
@@ -146,12 +170,54 @@ export class ItinerariesService {
         'New dates would leave existing hotel stays or flights outside the trip',
       );
 
-    await this.prisma.itinerary.update({
-      where: { id },
-      data: { name: dto.name, startDate, endDate },
+    const changes = tripChanges(itinerary, {
+      name: dto.name,
+      startDate,
+      endDate,
     });
+    await this.prisma.$transaction([
+      this.prisma.itinerary.update({
+        where: { id },
+        data: { name: dto.name, startDate, endDate },
+      }),
+      ...(Object.keys(changes).length
+        ? [
+            recordEvent(
+              this.prisma,
+              id,
+              currentUser,
+              ItineraryEventType.UPDATED,
+              {
+                changes,
+              },
+            ),
+          ]
+        : []),
+    ]);
 
     return this.findOne(id, currentUser);
+  }
+
+  // Newest first.
+  async findEvents(
+    id: string,
+    currentUser: ICurrentUser,
+    query: ItineraryEventQueryParams,
+  ) {
+    await this.getOwnedOrFail(id, currentUser);
+    const { skip, l: limit } = getPaginationParams(query.page, query.limit);
+    const where = { itineraryId: id, type: query.type };
+    const [events, total] = await this.prisma.$transaction([
+      this.prisma.itineraryEvent.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit,
+        skip,
+      }),
+      this.prisma.itineraryEvent.count({ where }),
+    ]);
+
+    return toPage(events, skip, limit, total);
   }
 
   async remove(id: string, currentUser: ICurrentUser) {
@@ -199,18 +265,27 @@ export class ItinerariesService {
       );
 
     const nights = nightsBetween(checkIn, checkOut);
-    await this.prisma.itineraryHotel.create({
-      data: {
-        itineraryId: id,
-        hotelId: hotel.id,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        rooms: dto.rooms,
-        nightlyRate: hotel.nightlyRate,
-        totalPrice: hotel.nightlyRate.mul(nights * dto.rooms),
-        currency: hotel.currency,
-      },
-    });
+    const stay = {
+      id: randomUUID(),
+      itineraryId: id,
+      hotelId: hotel.id,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      rooms: dto.rooms,
+      nightlyRate: hotel.nightlyRate,
+      totalPrice: hotel.nightlyRate.mul(nights * dto.rooms),
+      currency: hotel.currency,
+    };
+    await this.prisma.$transaction([
+      this.prisma.itineraryHotel.create({ data: stay }),
+      recordEvent(
+        this.prisma,
+        id,
+        currentUser,
+        ItineraryEventType.HOTEL_ADDED,
+        stayDetails(stay, hotel.name),
+      ),
+    ]);
 
     return this.findOne(id, currentUser);
   }
@@ -219,10 +294,22 @@ export class ItinerariesService {
     const itinerary = await this.getOwnedOrFail(id, currentUser);
     this.assertStatus(itinerary, ItineraryStatus.DRAFT);
 
-    const { count } = await this.prisma.itineraryHotel.deleteMany({
+    const stay = await this.prisma.itineraryHotel.findFirst({
       where: { id: itemId, itineraryId: id },
+      include: { hotel: { select: { name: true } } },
     });
-    if (!count) throw new NotFoundException('Hotel stay not found');
+    if (!stay) throw new NotFoundException('Hotel stay not found');
+
+    await this.prisma.$transaction([
+      this.prisma.itineraryHotel.delete({ where: { id: itemId } }),
+      recordEvent(
+        this.prisma,
+        id,
+        currentUser,
+        ItineraryEventType.HOTEL_REMOVED,
+        stayDetails(stay, stay.hotel.name),
+      ),
+    ]);
 
     return this.findOne(id, currentUser);
   }
@@ -259,19 +346,32 @@ export class ItinerariesService {
         ),
       );
 
-    await this.prisma.itineraryFlight.create({
-      data: {
-        itineraryId: id,
-        flightId: flight.id,
-        passengers,
-        unitPrice: flight.price,
-        totalPrice: flight.price.mul(passengers),
-        currency: flight.currency,
-        travelers: {
-          connect: travelerIds.map((travelerId) => ({ id: travelerId })),
+    const item = {
+      id: randomUUID(),
+      itineraryId: id,
+      flightId: flight.id,
+      passengers,
+      unitPrice: flight.price,
+      totalPrice: flight.price.mul(passengers),
+      currency: flight.currency,
+    };
+    await this.prisma.$transaction([
+      this.prisma.itineraryFlight.create({
+        data: {
+          ...item,
+          travelers: {
+            connect: travelerIds.map((travelerId) => ({ id: travelerId })),
+          },
         },
-      },
-    });
+      }),
+      recordEvent(
+        this.prisma,
+        id,
+        currentUser,
+        ItineraryEventType.FLIGHT_ADDED,
+        flightDetails(item, flight),
+      ),
+    ]);
 
     return this.findOne(id, currentUser);
   }
@@ -280,10 +380,24 @@ export class ItinerariesService {
     const itinerary = await this.getOwnedOrFail(id, currentUser);
     this.assertStatus(itinerary, ItineraryStatus.DRAFT);
 
-    const { count } = await this.prisma.itineraryFlight.deleteMany({
+    const item = await this.prisma.itineraryFlight.findFirst({
       where: { id: itemId, itineraryId: id },
+      include: {
+        flight: { select: { flightNumber: true, departureAt: true } },
+      },
     });
-    if (!count) throw new NotFoundException('Flight booking not found');
+    if (!item) throw new NotFoundException('Flight booking not found');
+
+    await this.prisma.$transaction([
+      this.prisma.itineraryFlight.delete({ where: { id: itemId } }),
+      recordEvent(
+        this.prisma,
+        id,
+        currentUser,
+        ItineraryEventType.FLIGHT_REMOVED,
+        flightDetails(item, item.flight),
+      ),
+    ]);
 
     return this.findOne(id, currentUser);
   }
@@ -307,6 +421,8 @@ export class ItinerariesService {
           'Add at least one hotel stay or flight before confirming',
         );
 
+      const booked: { totalPrice: Prisma.Decimal; currency: string }[] = [];
+
       // Each stay is marked CONFIRMED before the next is checked, so two stays
       // at the same hotel in one itinerary count against each other.
       for (const stay of stays) {
@@ -325,15 +441,19 @@ export class ItinerariesService {
           );
 
         const nights = nightsBetween(stay.checkInDate, stay.checkOutDate);
+        const price = {
+          totalPrice: stay.hotel.nightlyRate.mul(nights * stay.rooms),
+          currency: stay.hotel.currency,
+        };
         await tx.itineraryHotel.update({
           where: { id: stay.id },
           data: {
             status: BookingStatus.CONFIRMED,
             nightlyRate: stay.hotel.nightlyRate,
-            totalPrice: stay.hotel.nightlyRate.mul(nights * stay.rooms),
-            currency: stay.hotel.currency,
+            ...price,
           },
         });
+        booked.push(price);
       }
 
       for (const item of flights) {
@@ -355,20 +475,29 @@ export class ItinerariesService {
             ),
           );
 
+        const price = {
+          totalPrice: item.flight.price.mul(item.passengers),
+          currency: item.flight.currency,
+        };
         await tx.itineraryFlight.update({
           where: { id: item.id },
           data: {
             status: BookingStatus.CONFIRMED,
             unitPrice: item.flight.price,
-            totalPrice: item.flight.price.mul(item.passengers),
-            currency: item.flight.currency,
+            ...price,
           },
         });
+        booked.push(price);
       }
 
       await tx.itinerary.update({
         where: { id },
         data: { status: ItineraryStatus.PLANNED },
+      });
+      await recordEvent(tx, id, currentUser, ItineraryEventType.CONFIRMED, {
+        hotelStays: stays.length,
+        flights: flights.length,
+        totals: totalsByCurrency(booked),
       });
     });
 
@@ -393,7 +522,7 @@ export class ItinerariesService {
         );
       }
 
-      await tx.itineraryHotel.updateMany({
+      const { count: hotelStays } = await tx.itineraryHotel.updateMany({
         where: { itineraryId: id },
         data: { status: BookingStatus.CANCELLED },
       });
@@ -404,6 +533,11 @@ export class ItinerariesService {
       await tx.itinerary.update({
         where: { id },
         data: { status: ItineraryStatus.CANCELLED },
+      });
+      await recordEvent(tx, id, currentUser, ItineraryEventType.CANCELLED, {
+        hotelStays,
+        flights: flights.length,
+        releasedSeats: flights.reduce((sum, f) => sum + f.passengers, 0),
       });
     });
 
