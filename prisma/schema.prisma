@@ -26,6 +26,17 @@ enum Role {
   USER
 }
 
+enum ItineraryEventType {
+  CREATED
+  UPDATED
+  HOTEL_ADDED
+  HOTEL_REMOVED
+  FLIGHT_ADDED
+  FLIGHT_REMOVED
+  CONFIRMED
+  CANCELLED
+}
+
 model User {
   id String @id @default(uuid())
   email String @unique
@@ -41,6 +52,7 @@ model User {
   travelers Traveler[]
   idempotencyKeys IdempotencyKey[]
   refreshTokens RefreshToken[]
+  itineraryEvents ItineraryEvent[]
 
   @@map("users")
 }
@@ -219,9 +231,31 @@ model Itinerary {
   destination Destination @relation(fields: [destinationId], references: [id])
   itineraryHotel ItineraryHotel[]
   itineraryFlight ItineraryFlight[]
+  events ItineraryEvent[]
 
   @@index([userId])
   @@map("itineraries")
+}
+
+// What happened to an itinerary, when and by whom: the history users and the
+// AI agent read back. Each event is written in the same transaction as the
+// change it describes, so the log never disagrees with the data.
+model ItineraryEvent {
+  id String @id @default(uuid())
+  itineraryId String
+  type ItineraryEventType
+  // Null once the acting account is deleted; actorRole still tells whether
+  // it was a user or an admin.
+  actorId String?
+  actorRole Role
+  details Json?
+  createdAt DateTime @default(now())
+
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([itineraryId, createdAt])
+  @@map("itinerary_events")
 }
 
 model ItineraryHotel {
