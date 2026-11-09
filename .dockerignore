@@ -1,0 +1,17 @@
+# Rebuilt inside the image
+node_modules
+dist
+generated
+coverage
+openapi.json
+
+# Secrets never go into the build context; compose passes them at runtime
+.env
+.env.*
+
+# Not needed to build or run
+.git
+.github
+.claude
+test
+*.log
