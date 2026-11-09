@@ -85,3 +85,30 @@ jobs:
       - run: bunx prisma generate
       - run: bun run test
       - run: bun run test:e2e
+
+  docker:
+    name: Docker image & compose stack
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-only-secret
+      SEED_ADMIN_EMAIL: admin@trek.ci
+      SEED_ADMIN_PASSWORD: ci-admin-password
+      BCRYPT_SALT_ROUNDS: '4'
+    steps:
+      - uses: actions/checkout@v4
+
+      # Builds both images, migrates a fresh database and waits for the API's
+      # health check to pass.
+      - run: docker compose up --build --detach --wait --wait-timeout 180
+
+      - name: API is ready and serving
+        run: |
+          curl --fail --silent http://localhost:3000/api/health/ready
+          curl --fail --silent --output /dev/null http://localhost:3000/api/docs-json
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - if: always()
+        run: docker compose down --volumes
