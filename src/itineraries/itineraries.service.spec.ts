@@ -36,6 +36,7 @@ describe('ItinerariesService', () => {
     itinerary: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock };
     hotel: { findUnique: jest.Mock };
     itineraryHotel: { create: jest.Mock };
+    itineraryEvent: { create: jest.Mock };
   };
   let inventory: { availableHotelRooms: jest.Mock };
   let service: ItinerariesService;
@@ -49,6 +50,7 @@ describe('ItinerariesService', () => {
       },
       hotel: { findUnique: jest.fn() },
       itineraryHotel: { create: jest.fn() },
+      itineraryEvent: { create: jest.fn() },
     };
     inventory = { availableHotelRooms: jest.fn().mockResolvedValue(10) };
     service = new ItinerariesService(
@@ -157,6 +159,40 @@ describe('ItinerariesService', () => {
       expect(data.checkOutDate).toEqual(new Date('2030-01-05T00:00:00Z'));
       expect(data.totalPrice.toNumber()).toBe(3 * 2 * 120);
       expect(data.currency).toBe('USD');
+    });
+
+    it('logs the stay in the same transaction', async () => {
+      prisma.hotel.findUnique.mockResolvedValue(hotel);
+      prisma.itineraryHotel.create.mockReturnValue('create stay');
+      prisma.itineraryEvent.create.mockReturnValue('log stay');
+
+      await service.addHotel('trip', alice, stay);
+
+      const [{ data: item }] = prisma.itineraryHotel.create.mock.calls[0] as [
+        { data: { id: string } },
+      ];
+      expect(prisma.itineraryEvent.create).toHaveBeenCalledWith({
+        data: {
+          itineraryId: 'trip',
+          type: 'HOTEL_ADDED',
+          actorId: 'alice',
+          actorRole: 'USER',
+          details: {
+            itemId: item.id,
+            hotelId: 'hill-view',
+            hotelName: 'Hill View',
+            checkInDate: '2030-01-02',
+            checkOutDate: '2030-01-05',
+            rooms: 2,
+            totalPrice: '720.00',
+            currency: 'USD',
+          },
+        },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledWith([
+        'create stay',
+        'log stay',
+      ]);
     });
 
     it('rejects hotels in another destination', async () => {

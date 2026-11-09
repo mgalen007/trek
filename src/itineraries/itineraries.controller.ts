@@ -21,7 +21,11 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
 import { AddFlightDto } from './dto/add-flight.dto';
-import { ItineraryQueryParams } from './types/itinerary-query.types';
+import {
+  ItineraryEventQueryParams,
+  ItineraryQueryParams,
+} from './types/itinerary-query.types';
+import { ItineraryEventEntity } from './entities/itinerary-event.entity';
 import {
   ItineraryDetailEntity,
   ItineraryEntity,
@@ -92,6 +96,28 @@ export class ItinerariesController {
     const itinerary = await this.itinerariesService.findOne(id, currentUser);
 
     return itinerary;
+  }
+
+  @Get(':id/events')
+  @ApiOperation({
+    summary: "Get an itinerary's activity history",
+    description:
+      'What happened to the itinerary, newest first: creation, edits, items added or removed, confirmation and cancellation, with who did it.',
+  })
+  @ApiPageResponse(ItineraryEventEntity)
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
+  async findEvents(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ItineraryEventQueryParams,
+    @CurrentUser() currentUser: ICurrentUser,
+  ) {
+    const events = await this.itinerariesService.findEvents(
+      id,
+      currentUser,
+      query,
+    );
+
+    return events;
   }
 
   @Put(':id')
