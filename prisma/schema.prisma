@@ -35,6 +35,7 @@ enum ItineraryEventType {
   FLIGHT_REMOVED
   CONFIRMED
   CANCELLED
+  COMPLETED
 }
 
 model User {
@@ -244,10 +245,11 @@ model ItineraryEvent {
   id String @id @default(uuid())
   itineraryId String
   type ItineraryEventType
-  // Null once the acting account is deleted; actorRole still tells whether
-  // it was a user or an admin.
+  // actorId is nulled once the acting account is deleted; actorRole still
+  // tells whether it was a user or an admin. Both null: done by the system
+  // (scheduled jobs).
   actorId String?
-  actorRole Role
+  actorRole Role?
   details Json?
   createdAt DateTime @default(now())
 
