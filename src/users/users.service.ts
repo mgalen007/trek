@@ -4,7 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ItineraryStatus } from '../../generated/prisma/client';
+import {
+  AccountTokenPurpose,
+  ItineraryStatus,
+} from '../../generated/prisma/client';
 import { apiError, ErrorCode } from 'common/http/api-error';
 import { toDateOnly } from 'common/helpers/date.helpers';
 import { ConfigService } from '@nestjs/config';
@@ -13,8 +16,9 @@ import type { ICurrentUser } from '../auth/types/user.types';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Role } from '../auth/types/auth.types';
 import * as bcrypt from 'bcryptjs';
-import { outboxData } from '../email/email-outbox';
-import { welcomeEmail } from '../email/templates';
+import { outboxData, queueEmail } from '../email/email-outbox';
+import { emailChangedEmail, welcomeEmail } from '../email/templates';
+import { newAccountToken, queueVerification } from '../auth/account-tokens';
 
 @Injectable()
 export class UsersService {
@@ -29,6 +33,11 @@ export class UsersService {
       this.configService.getOrThrow<number>('BCRYPT_SALT_ROUNDS'),
     );
     const hash = await bcrypt.hash(password, saltRounds);
+    const verification = newAccountToken(
+      AccountTokenPurpose.EMAIL_VERIFICATION,
+      dto.email,
+      this.appUrl,
+    );
 
     const user = await this.prisma.user.create({
       data: {
@@ -36,8 +45,13 @@ export class UsersService {
         passwordHash: hash,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        // The welcome email carries the first verification code.
+        accountTokens: { create: verification.data },
         emails: {
-          create: outboxData(dto.email, welcomeEmail(dto.firstName)),
+          create: outboxData(
+            dto.email,
+            welcomeEmail(dto.firstName, verification.action),
+          ),
         },
       },
       omit: {
@@ -77,15 +91,37 @@ export class UsersService {
     return user;
   }
 
+  // A new email address starts unverified: a code goes to it, and a notice
+  // to the old one so a takeover can't move the account silently.
   async update(id: string, currentUser: ICurrentUser, newUser: UpdateUserDto) {
-    await this.getAccessibleOrFail(id, currentUser);
+    const before = await this.getAccessibleOrFail(id, currentUser);
+    const emailChanged =
+      newUser.email !== undefined && newUser.email !== before.email;
 
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: { ...newUser },
-      omit: { passwordHash: true },
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id },
+        data: {
+          ...newUser,
+          ...(emailChanged ? { emailVerifiedAt: null } : {}),
+        },
+        omit: { passwordHash: true },
+      });
+      if (emailChanged) {
+        await queueVerification(tx, user, this.appUrl);
+        await queueEmail(
+          tx,
+          user.id,
+          before.email,
+          emailChangedEmail(before.firstName, user.email),
+        );
+      }
+      return user;
     });
-    return user;
+  }
+
+  private get appUrl() {
+    return this.configService.get<string>('APP_URL') || undefined;
   }
 
   async findAll() {
@@ -96,6 +132,7 @@ export class UsersService {
         role: true,
         firstName: true,
         lastName: true,
+        emailVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
       },

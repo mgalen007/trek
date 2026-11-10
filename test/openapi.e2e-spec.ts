@@ -29,6 +29,9 @@ const PUBLIC_OPERATIONS = [
   'auth_register',
   'auth_refresh',
   'auth_logout',
+  'auth_forgotPassword',
+  'auth_resetPassword',
+  'auth_verifyEmail',
   'health_check',
   'health_ready',
 ];
@@ -104,6 +107,8 @@ describe('OpenAPI docs (e2e)', () => {
 
     for (const o of posts) {
       if (PUBLIC_OPERATIONS.includes(o.operationId)) continue;
+      // Its body holds passwords, which the idempotency store would hash.
+      if (o.operationId === 'auth_changePassword') continue;
       const header = o.parameters?.find(
         (p) => p.in === 'header' && p.name === 'Idempotency-Key',
       );

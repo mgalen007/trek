@@ -9,6 +9,7 @@ import {
   RefreshTokensService,
 } from './refresh-tokens.service';
 import type { JwtPayload } from './types/jwt.types';
+import { AccountService } from './account.service';
 import type { User } from '../../generated/prisma/client';
 import type { AuthTokensEntity } from './entities/auth-tokens.entity';
 
@@ -19,6 +20,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private refreshTokens: RefreshTokensService,
+    private account: AccountService,
   ) {}
 
   async login(email: string, password: string) {
@@ -42,6 +44,21 @@ export class AuthService {
   // changes take effect on the next refresh.
   async refresh(token: string) {
     const { user, refreshToken } = await this.refreshTokens.rotate(token);
+    return this.tokens(user, refreshToken);
+  }
+
+  // Every session is revoked by the change, so the caller gets a new one.
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.account.changePassword(
+      userId,
+      currentPassword,
+      newPassword,
+    );
+    const refreshToken = await this.refreshTokens.startSession(user.id);
     return this.tokens(user, refreshToken);
   }
 

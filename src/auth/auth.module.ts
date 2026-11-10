@@ -8,6 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshTokensService } from './refresh-tokens.service';
+import { AccountService } from './account.service';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { RefreshTokensService } from './refresh-tokens.service';
     PassportModule,
     UsersModule,
   ],
-  providers: [AuthService, RefreshTokensService, JwtStrategy],
+  providers: [AuthService, AccountService, RefreshTokensService, JwtStrategy],
   controllers: [AuthController],
 })
 export class AuthModule {}

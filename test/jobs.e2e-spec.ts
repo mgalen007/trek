@@ -96,6 +96,7 @@ describe('Scheduled jobs (e2e)', () => {
 
     expect(names.sort()).toEqual([
       'complete-past-itineraries',
+      'purge-account-tokens',
       'purge-emails',
       'purge-idempotency-keys',
       'purge-refresh-tokens',

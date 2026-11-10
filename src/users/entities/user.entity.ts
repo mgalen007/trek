@@ -9,6 +9,8 @@ export class UserEntity {
   lastName: string;
   @ApiProperty({ enum: Role, enumName: 'Role' })
   role: Role;
+  /** When the current email address was verified; null until it is. */
+  emailVerifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -17,6 +17,13 @@ import {
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from './dto/account.dto';
+import { AccountService } from './account.service';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -38,6 +45,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
+    private account: AccountService,
   ) {}
 
   @Post('login')
@@ -99,6 +107,101 @@ export class AuthController {
   @ApiErrorResponses([HttpStatus.UNAUTHORIZED])
   async logoutAll(@CurrentUser() user: ICurrentUser) {
     await this.authService.logoutAll(user.id);
+  }
+
+  // Not @Idempotent: the idempotency store would keep a hash of a body
+  // holding passwords, and the response holds fresh tokens.
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @StrictRateLimit()
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change password',
+    description:
+      'Checks the current password and sets a new one. Every session is revoked (access tokens already issued stay valid until they expire) and a new one is returned. The owner is notified by email.',
+  })
+  @ApiDataResponse(AuthTokensEntity)
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED], {
+    [HttpStatus.BAD_REQUEST]:
+      'Current password is wrong (INVALID_CREDENTIALS), or invalid input (VALIDATION_FAILED)',
+  })
+  changePassword(
+    @CurrentUser() user: ICurrentUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+  }
+
+  @Post('forgot-password')
+  @StrictRateLimit()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Request a password reset',
+    description:
+      'Emails a single-use reset code, valid for 1 hour, if the address has an account. Always answers 204, so it reveals nothing about which addresses are registered. At most one email per minute per account.',
+  })
+  @ApiNoContentResponse({ description: 'Request accepted' })
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST])
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.account.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @StrictRateLimit()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Reset the password with an emailed code',
+    description:
+      'Sets a new password and signs out every session; log in again afterwards. Also verifies the email address, since the code proves access to it.',
+  })
+  @ApiNoContentResponse({ description: 'Password changed' })
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST], {
+    [HttpStatus.BAD_REQUEST]:
+      'Code is invalid, expired or used (INVALID_RESET_TOKEN), or invalid input (VALIDATION_FAILED)',
+  })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.account.resetPassword(dto.token, dto.newPassword);
+  }
+
+  @Post('verify-email')
+  @StrictRateLimit()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Verify the email address with an emailed code',
+    description:
+      'Codes are sent on registration, on email change and on request, and are valid for 48 hours for the address they were sent to.',
+  })
+  @ApiNoContentResponse({ description: 'Email verified' })
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST], {
+    [HttpStatus.BAD_REQUEST]:
+      'Code is invalid, expired, used or for an old address (INVALID_VERIFICATION_TOKEN), or invalid input (VALIDATION_FAILED)',
+  })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    await this.account.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @Idempotent()
+  @StrictRateLimit()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Resend the verification email',
+    description:
+      'Sends a new code to the current address. At most one email per minute; extra requests are accepted but send nothing.',
+  })
+  @ApiNoContentResponse({ description: 'Request accepted' })
+  @ApiErrorResponses([HttpStatus.UNAUTHORIZED, HttpStatus.CONFLICT], {
+    [HttpStatus.CONFLICT]: 'Already verified (EMAIL_ALREADY_VERIFIED)',
+  })
+  async resendVerification(@CurrentUser() user: ICurrentUser) {
+    await this.account.resendVerification(user.id);
   }
 
   @Post('register')

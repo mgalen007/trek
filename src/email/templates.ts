@@ -81,16 +81,135 @@ const flightText = (f: FlightLine) =>
 const list = (items: string[]) =>
   `<ul>${items.map((item) => `<li>${e(item)}</li>`).join('')}</ul>`;
 
-export const welcomeEmail = (firstName: string): RenderedEmail => {
+/**
+ * A single-use code from an email, with a link to the app when APP_URL is
+ * configured. Without a link, the code is entered in the app (or sent to the
+ * API by a client).
+ */
+export interface ActionCode {
+  code: string;
+  link?: string;
+}
+
+const actionText = (action: ActionCode, verb: string, valid: string) =>
+  action.link
+    ? [`${verb}: ${action.link}`, '', `The link is valid for ${valid}.`]
+    : [`Your code: ${action.code}`, '', `It is valid for ${valid}.`];
+
+const actionHtml = (action: ActionCode, verb: string, valid: string) =>
+  action.link
+    ? `<p><a href="${e(action.link)}">${e(verb)}</a></p>` +
+      p(`The link is valid for ${valid}.`)
+    : `<p>Your code: <code style="font-size:14px">${e(action.code)}</code></p>` +
+      p(`It is valid for ${valid}.`);
+
+export const welcomeEmail = (
+  firstName: string,
+  verification: ActionCode,
+): RenderedEmail => {
   const title = `Welcome to Trek, ${firstName}`;
-  const lines = [
-    'Your account is ready. Browse destinations, put together a trip, and confirm it to book every hotel and flight at once.',
-  ];
+  const intro =
+    'Your account is ready. Browse destinations, put together a trip, and confirm it to book every hotel and flight at once.';
+  const verb = 'Verify your email address';
   return {
     template: 'WELCOME',
     subject: title,
+    text: [
+      `Hi ${firstName},`,
+      '',
+      intro,
+      '',
+      ...actionText(verification, verb, '48 hours'),
+    ].join('\n'),
+    html: layout(title, p(intro) + actionHtml(verification, verb, '48 hours')),
+  };
+};
+
+export const verifyEmailEmail = (
+  firstName: string,
+  verification: ActionCode,
+): RenderedEmail => {
+  const verb = 'Verify your email address';
+  return {
+    template: 'VERIFY_EMAIL',
+    subject: 'Verify your email address',
+    text: [
+      `Hi ${firstName},`,
+      '',
+      ...actionText(verification, verb, '48 hours'),
+    ].join('\n'),
+    html: layout(
+      verb,
+      p(`Hi ${firstName},`) + actionHtml(verification, verb, '48 hours'),
+    ),
+  };
+};
+
+const NOT_YOU =
+  "If this wasn't you, reset your password right away and contact support.";
+
+export const passwordResetEmail = (
+  firstName: string,
+  reset: ActionCode,
+): RenderedEmail => {
+  const verb = 'Choose a new password';
+  const ignore =
+    "If you didn't ask for this, ignore this email: your password stays the same.";
+  return {
+    template: 'PASSWORD_RESET',
+    subject: 'Reset your Trek password',
+    text: [
+      `Hi ${firstName},`,
+      '',
+      'Someone asked to reset the password for your account.',
+      '',
+      ...actionText(reset, verb, '1 hour'),
+      '',
+      ignore,
+    ].join('\n'),
+    html: layout(
+      'Reset your password',
+      p(`Hi ${firstName},`) +
+        p('Someone asked to reset the password for your account.') +
+        actionHtml(reset, verb, '1 hour') +
+        p(ignore),
+    ),
+  };
+};
+
+export const passwordChangedEmail = (firstName: string): RenderedEmail => {
+  const lines = [
+    'Your Trek password was just changed, and every device was signed out.',
+    NOT_YOU,
+  ];
+  return {
+    template: 'PASSWORD_CHANGED',
+    subject: 'Your Trek password was changed',
     text: [`Hi ${firstName},`, '', ...lines].join('\n'),
-    html: layout(title, lines.map(p).join('')),
+    html: layout(
+      'Your password was changed',
+      [`Hi ${firstName},`, ...lines].map(p).join(''),
+    ),
+  };
+};
+
+// Sent to the old address, so an account takeover can't silently move it.
+export const emailChangedEmail = (
+  firstName: string,
+  newEmail: string,
+): RenderedEmail => {
+  const lines = [
+    `The email address on your Trek account was changed to ${newEmail}. Messages now go there.`,
+    NOT_YOU,
+  ];
+  return {
+    template: 'EMAIL_CHANGED',
+    subject: 'Your Trek email address was changed',
+    text: [`Hi ${firstName},`, '', ...lines].join('\n'),
+    html: layout(
+      'Your email address was changed',
+      [`Hi ${firstName},`, ...lines].map(p).join(''),
+    ),
   };
 };
 

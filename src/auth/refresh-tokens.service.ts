@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
+import { hashSecret, newSecret } from 'common/helpers/secrets';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import { apiError, ErrorCode } from 'common/http/api-error';
@@ -15,10 +16,7 @@ export const REUSE_GRACE_MS = 30_000;
 
 const DEFAULT_TTL_DAYS = 30;
 
-// Tokens are 256 random bits, so a fast hash is enough to make a leaked
-// table useless; bcrypt would only slow down every refresh.
-const hashToken = (token: string) =>
-  createHash('sha256').update(token).digest('hex');
+const hashToken = hashSecret;
 
 const invalid = () =>
   new UnauthorizedException(
@@ -132,7 +130,7 @@ export class RefreshTokensService {
     familyId: string,
     db: Db = this.prisma,
   ): Promise<IssuedRefreshToken> {
-    const token = randomBytes(32).toString('base64url');
+    const token = newSecret();
     const expiresAt = new Date(Date.now() + this.ttlMs());
     await db.refreshToken.create({
       data: { userId, familyId, tokenHash: hashToken(token), expiresAt },
