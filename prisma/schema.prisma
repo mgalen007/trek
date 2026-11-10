@@ -45,6 +45,8 @@ model User {
   firstName String
   lastName String
   role Role @default(USER)
+  // Null until the current address is verified; changing the email clears it.
+  emailVerifiedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -55,8 +57,33 @@ model User {
   refreshTokens RefreshToken[]
   itineraryEvents ItineraryEvent[]
   emails EmailOutbox[]
+  accountTokens AccountToken[]
 
   @@map("users")
+}
+
+enum AccountTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+// Single-use codes emailed to users, stored as SHA-256 hashes like refresh
+// tokens. A verification code is bound to the address it was sent to, so it
+// can't verify a different email set later.
+model AccountToken {
+  id String @id @default(uuid())
+  userId String
+  purpose AccountTokenPurpose
+  tokenHash String @unique
+  email String
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("account_tokens")
 }
 
 enum EmailStatus {
