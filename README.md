@@ -1,98 +1,232 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Trek
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A travel booking and itinerary-planning API. Users browse destinations, hotels and flights, put together a draft trip, and confirm it to reserve every room and seat at once, or nothing.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Trek is built to be driven by an AI agent as much as by people: every response has the same shape, every error carries a machine-readable code, the OpenAPI spec is complete with stable operation ids, and mutations are safe to retry.
 
-## Description
+**Stack:** NestJS 11 · Prisma 7 · PostgreSQL 17 · Bun · Docker
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Contents
 
-## Project setup
+- [Features](#features)
+- [Quick start with Docker](#quick-start-with-docker)
+- [Local development](#local-development)
+- [Configuration](#configuration)
+- [Using the API](#using-the-api)
+- [Endpoints](#endpoints)
+- [Testing](#testing)
+- [Project layout](#project-layout)
+- [Roadmap](#roadmap)
+
+## Features
+
+- **Catalogue search:** destinations, hotels (filter by price, rating and real room availability for given dates) and flights (by route, date, passengers and price).
+- **Itineraries:** build a draft with hotel stays and flights, then **confirm** it to reserve everything in one all-or-nothing transaction, or **cancel** it to release everything. Concurrent bookings can't oversell a room or a seat.
+- **Activity log:** every change to a trip is recorded with who made it, readable as a timeline.
+- **Profiles:** travel preferences (home airport, currency, budget, minimum hotel rating…) and saved travelers to name on flight bookings.
+- **Accounts:** short-lived access tokens with rotating refresh tokens (reuse detection, log out, log out everywhere), email verification, password reset and change.
+- **Emails:** welcome, booking confirmed, cancelled and completed, password and email changes, delivered through a transactional outbox with retries.
+- **Built for automated clients:** `{ data }` responses, `error.code` on every error, `Idempotency-Key` on POST requests, per-user rate limits with `Retry-After`.
+- **Production basics:** health checks, security headers, CORS, scheduled maintenance jobs, Docker image and Compose stack, CI.
+
+## Quick start with Docker
+
+Requirements: Docker with Compose.
+
+1. Create a `.env` file in the project root with at least:
+
+   ```ini
+   JWT_SECRET=change-me-to-a-long-random-string
+   SEED_ADMIN_EMAIL=admin@example.com
+   SEED_ADMIN_PASSWORD=change-me-too
+   ```
+
+2. Start everything:
+
+   ```bash
+   docker compose up --build
+   ```
+
+   Compose starts PostgreSQL, applies the database migrations, then starts the API. It also starts [Mailpit](https://mailpit.axllent.org/), which catches every email the API sends.
+
+3. Open:
+
+   | What | Where |
+   |---|---|
+   | API | http://localhost:3000/api |
+   | Interactive docs (Swagger UI) | http://localhost:3000/api/docs |
+   | OpenAPI spec (JSON) | http://localhost:3000/api/docs-json |
+   | Health | http://localhost:3000/api/health/ready |
+   | Email inbox (Mailpit) | http://localhost:8025 |
+
+An admin account is created on first start from `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. Only admins can add destinations, hotels, airports and flights.
+
+| Task | Command |
+|---|---|
+| Follow the API logs | `docker compose logs -f api` |
+| Stop | `docker compose down` |
+| Stop and delete the database | `docker compose down --volumes` |
+| Use another port | `API_PORT=4000 docker compose up` |
+
+The Compose database is separate from any local PostgreSQL and isn't exposed on your machine. Set `SMTP_URL` in `.env` to send real email instead of catching it in Mailpit.
+
+## Local development
+
+Requirements: [Bun](https://bun.sh) 1.3, Node.js 22 (used by the Nest and Prisma CLIs and by Jest), PostgreSQL 17.
 
 ```bash
-$ bun install
+bun install
+bunx prisma generate                       # generate the database client
+bunx prisma migrate dev                    # create and migrate the database from DATABASE_URL
+bun run start:dev                          # watch mode on PORT (default 3000)
 ```
 
-## Compile and run the project
+Use Bun for everything in this repository, not npm.
+
+| Command | Purpose |
+|---|---|
+| `bun run start:dev` | Run with reload on change |
+| `bun run build` | Compile to `dist/` |
+| `bun run lint:check` | ESLint, zero warnings allowed (`bun run lint` fixes) |
+| `bun run typecheck` | TypeScript |
+| `bun run test` | Unit tests |
+| `bun run test:e2e` | End-to-end tests against PostgreSQL |
+| `bun run openapi:export` | Write the OpenAPI spec to `openapi.json` |
+| `bunx prisma migrate dev --name <name>` | Create a migration after changing `prisma/schema.prisma` |
+
+Without `SMTP_URL`, emails are written to the log instead of being sent.
+
+## Configuration
+
+Settings are read from environment variables, or from `.env` in development.
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | yes (not with Compose) | | PostgreSQL connection string |
+| `JWT_SECRET` | yes | | Signs access tokens |
+| `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | yes | | Admin account created on first start |
+| `SEED_ADMIN_FIRST_NAME`, `SEED_ADMIN_LAST_NAME` | yes (not with Compose) | | Its name |
+| `BCRYPT_SALT_ROUNDS` | yes (not with Compose) | Compose: `12` | Password hashing cost |
+| `PORT` | | `3000` | HTTP port |
+| `MAX_DB_CONNECTIONS` | | | Database pool size |
+| `JWT_EXPIRES_IN` | | `15m` | Access token lifetime |
+| `REFRESH_TOKEN_TTL_DAYS` | | `30` | Refresh token lifetime |
+| `RATE_LIMIT_PER_MINUTE` | | `120` | Requests per minute per user (per IP when anonymous) |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | | `10` | Stricter limit on login, registration, password and verification routes |
+| `TRUST_PROXY` | | | Set behind a load balancer (e.g. `1`) so rate limits see real client IPs |
+| `CORS_ORIGINS` | | | Comma-separated browser origins; CORS is off when unset |
+| `SMTP_URL` | | | `smtp(s)://user:pass@host:port`; without it emails are only logged |
+| `MAIL_FROM` | | `Trek <no-reply@trek.local>` | Sender address |
+| `APP_URL` | | | Frontend URL; verification and reset emails then contain links instead of bare codes |
+| `SCHEDULED_JOBS` | | | `off` disables the background jobs |
+
+## Using the API
+
+Every route is under `/api`. The [Swagger UI](http://localhost:3000/api/docs) documents each one, including request bodies, responses and error codes, and lets you try them.
+
+### Responses
+
+Successes are wrapped in `data`, with `pagination` on lists:
+
+```json
+{ "data": [ … ], "pagination": { "page": 1, "skip": 0, "limit": 15, "total": 42, "totalPages": 3 } }
+```
+
+Errors always look like this. Branch on `error.code`, never on the message:
+
+```json
+{ "statusCode": 409, "error": { "code": "ROOMS_UNAVAILABLE", "message": "Only 1 room(s) left at Hill View for those dates" } }
+```
+
+### Signing in
+
+`POST /api/auth/login` returns a short-lived `accessToken`, sent as `Authorization: Bearer <token>`, and a `refreshToken`. Exchange the refresh token at `POST /api/auth/refresh` before the access token expires. Each refresh returns a new refresh token, and the old one stops working. Reusing a spent refresh token signs out that session everywhere.
+
+### Booking a trip
 
 ```bash
-# development
-$ bun run start
+API=http://localhost:3000/api
+TOKEN=...   # accessToken from /auth/login
 
-# watch mode
-$ bun run start:dev
+# 1. Find a hotel with rooms free on your dates
+curl "$API/hotels?destinationId=<id>&checkIn=2027-03-01&checkOut=2027-03-04&rooms=1" -H "Authorization: Bearer $TOKEN"
 
-# production mode
-$ bun run start:prod
+# 2. Start a draft trip
+curl -X POST $API/itineraries -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"Kigali in March","destinationId":"<id>","startDate":"2027-03-01","endDate":"2027-03-04"}'
+
+# 3. Add a hotel stay (and flights, with POST /itineraries/<tripId>/flights)
+curl -X POST $API/itineraries/<tripId>/hotels -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"hotelId":"<id>","checkInDate":"2027-03-01","checkOutDate":"2027-03-04","rooms":1}'
+
+# 4. Confirm: reserves every room and seat at current prices, or nothing
+curl -X POST $API/itineraries/<tripId>/confirm -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: confirm-<tripId>-1"
 ```
 
-## Run tests
+Availability is checked when items are added, but only reserved when the trip is confirmed. A confirmed trip becomes `PLANNED`, can be cancelled to release everything, and becomes `COMPLETED` automatically after its last day.
+
+### Retrying safely
+
+Send an `Idempotency-Key` header (for example a UUID) with POST requests. Repeating a request with the same key within 24 hours returns the original response, marked `Idempotent-Replayed: true`, instead of doing the work twice.
+
+### Rate limits
+
+Each signed-in user has a budget of requests per minute across the API; anonymous requests share one per IP. Over the limit, the API answers `429 TOO_MANY_REQUESTS` with a `Retry-After` header.
+
+## Endpoints
+
+Admin-only routes are marked (admin). Users can only see and change their own profile, trips, travelers and preferences; anyone else's are reported as not found.
+
+| Area | Routes |
+|---|---|
+| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/logout-all`, `GET /auth/me` |
+| Account | `POST /auth/verify-email`, `/auth/resend-verification`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/change-password` |
+| Users | `GET /users` (admin), `GET`, `PUT`, `DELETE /users/:id` |
+| Preferences | `GET`, `PUT /users/me/preferences` |
+| Travelers | `GET`, `POST /travelers`, `GET`, `PUT`, `DELETE /travelers/:id` |
+| Destinations | `GET /destinations`, `GET /destinations/:id`, `/destinations/:id/hotels`, `/destinations/:id/airports`; create, update, delete (admin) |
+| Hotels | `GET /hotels`, `GET /hotels/:id`; create, update, delete (admin) |
+| Airports | `GET /airports`, `GET /airports/:id`; create, update, delete (admin) |
+| Flights | `GET /flights`, `GET /flights/:id`; create, update, delete (admin) |
+| Itineraries | `GET`, `POST /itineraries`, `GET`, `PUT`, `DELETE /itineraries/:id`, `GET /itineraries/:id/events`, `POST`/`DELETE` hotel stays and flights, `POST /itineraries/:id/confirm`, `/itineraries/:id/cancel` |
+| Health | `GET /health`, `GET /health/ready` |
+
+## Testing
 
 ```bash
-# unit tests
-$ bun run test
-
-# e2e tests
-$ bun run test:e2e
-
-# test coverage
-$ bun run test:cov
+bun run test        # unit tests
+bun run test:e2e    # end-to-end tests
 ```
 
-## Deployment
+The end-to-end tests use a separate database: `DATABASE_URL` with `_test` appended to its name, or `TEST_DATABASE_URL`. It's created and migrated automatically and emptied before each test file. The tests refuse to run against any database whose name doesn't end in `_test`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+CI (GitHub Actions) runs lint, type-checking, the build, the OpenAPI export, both test suites against PostgreSQL 17, and starts the Docker Compose stack to check it becomes healthy.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Project layout
 
-```bash
-$ bun install -g @nestjs/mau
-$ mau deploy
+```
+src/
+  auth/          sign-in, sessions, account security
+  users/         profiles · preferences/ · travelers/
+  destinations/  hotels/  airports/  flights/     the catalogue
+  itineraries/   trips, bookings and the activity log
+  inventory/     availability and reservations of rooms and seats
+  email/         templates, outbox and mail delivery
+  jobs/          scheduled maintenance
+  idempotency/   rate-limit/   health/
+common/          shared HTTP envelope, errors, filters and helpers
+prisma/          schema and migrations
+test/            end-to-end tests
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](CLAUDE.md).
 
-## Resources
+## Roadmap
 
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
+- **Next:** delegated access for the AI agent, with user approval for bookings; price quotes before confirming; sample catalogue data; request IDs.
+- **Then:** an AI agent built with PydanticAI that plans and books trips through this API; real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Not licensed for reuse (`UNLICENSED` in `package.json`).

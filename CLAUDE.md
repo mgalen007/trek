@@ -114,6 +114,7 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
 - **Phase 1** — itineraries and all-or-nothing bookings. Done.
 - **Phase 2** — search and filtering. Done.
 - **Phase 3 — groundwork for the AI agent.** Done: response envelope + error codes, OpenAPI, user preferences + travelers, Idempotency-Key, refresh tokens, itinerary activity log.
-- **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting, Docker, scheduled jobs, transactional emails, password change/reset and email verification. Next: a real README.
+- **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting, Docker, scheduled jobs, transactional emails, password change/reset and email verification, README.
+- **Before the agent** (next, in order): delegated agent access tokens plus user approval for confirming bookings (designed together); a quote endpoint and an expected total on confirm (`PRICE_CHANGED`); sample catalogue seed data; request IDs.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
 - **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.
