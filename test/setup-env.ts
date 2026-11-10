@@ -15,3 +15,6 @@ process.env.SCHEDULED_JOBS = 'off';
 // Never send real email from tests, even if .env has SMTP_URL; the
 // LogMailer keeps messages in memory for assertions.
 process.env.MAIL_TRANSPORT = 'log';
+
+// Emails show bare codes (no app links), which tests read back from the outbox.
+process.env.APP_URL = '';

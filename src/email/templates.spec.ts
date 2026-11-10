@@ -15,11 +15,27 @@ describe('email templates', () => {
   });
 
   it('escapes user-supplied values in HTML but not in text', () => {
-    const email = welcomeEmail('<script>alert(1)</script>');
+    const email = welcomeEmail('<script>alert(1)</script>', { code: 'abc' });
 
     expect(email.html).not.toContain('<script>');
     expect(email.html).toContain('&lt;script&gt;');
     expect(email.text).toContain('Hi <script>alert(1)</script>,');
+  });
+
+  it('shows a code, or a link when the app URL is known', () => {
+    const withCode = welcomeEmail('Ada', { code: 'abc123' });
+    expect(withCode.text).toContain('Your code: abc123');
+
+    const withLink = welcomeEmail('Ada', {
+      code: 'abc123',
+      link: 'https://app.trek.test/verify-email?token=abc123&x="y"',
+    });
+    expect(withLink.text).toContain(
+      'Verify your email address: https://app.trek.test/verify-email?token=abc123',
+    );
+    expect(withLink.html).toContain(
+      'href="https://app.trek.test/verify-email?token=abc123&amp;x=&quot;y&quot;"',
+    );
   });
 
   it('lists every stay, flight and total of a confirmed trip', () => {

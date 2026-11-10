@@ -69,6 +69,25 @@ export class MaintenanceService {
     return count;
   }
 
+  @Cron(CronExpression.EVERY_DAY_AT_3AM, {
+    name: 'purge-account-tokens',
+    timeZone: 'UTC',
+  })
+  runPurgeAccountTokens() {
+    return this.run('purge-account-tokens', () => this.purgeAccountTokens());
+  }
+
+  /** Verification and reset codes a day after they expired or were used. */
+  async purgeAccountTokens() {
+    const dayAgo = new Date(Date.now() - REVOKED_TOKEN_RETENTION_MS);
+    const { count } = await this.prisma.accountToken.deleteMany({
+      where: {
+        OR: [{ expiresAt: { lt: dayAgo } }, { usedAt: { lt: dayAgo } }],
+      },
+    });
+    return count;
+  }
+
   /** Expired refresh tokens, and revoked ones after a day. */
   async purgeRefreshTokens() {
     const now = Date.now();
