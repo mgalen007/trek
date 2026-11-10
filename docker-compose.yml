@@ -1,0 +1,63 @@
+# Full local stack: Postgres, a one-off migration job, then the API.
+#
+#   docker compose up --build
+#
+# Secrets come from .env (read by compose for ${...} substitution) or the
+# shell. DATABASE_URL in .env is ignored here: the API talks to the db
+# service. Postgres isn't published to the host, so it can't clash with a
+# local one on 5432.
+
+x-database-url: &database-url postgresql://trek:trek@db:5432/trek
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: trek
+      POSTGRES_PASSWORD: trek
+      POSTGRES_DB: trek
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U trek -d trek']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: build
+    command: ['bunx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - '${API_PORT:-3000}:3000'
+    environment:
+      DATABASE_URL: *database-url
+      MAX_DB_CONNECTIONS: '10'
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env or the shell}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-12}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:?set SEED_ADMIN_EMAIL}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD}
+      SEED_ADMIN_FIRST_NAME: ${SEED_ADMIN_FIRST_NAME:-Admin}
+      SEED_ADMIN_LAST_NAME: ${SEED_ADMIN_LAST_NAME:-User}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  db-data:

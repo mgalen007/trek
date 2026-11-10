@@ -31,7 +31,11 @@ bun run test -- -t "retries P2034"
 bun run test:e2e -- test/idempotency.e2e-spec.ts
 ```
 
-CI (`.github/workflows/ci.yml`) runs lint:check → typecheck → build → OpenAPI export, then unit + e2e tests against a Postgres 17 service. Run that same sequence locally before committing.
+CI (`.github/workflows/ci.yml`) runs lint:check → typecheck → build → OpenAPI export, then unit + e2e tests against a Postgres 17 service, and a `docker` job that brings the compose stack up and checks readiness. Run the same lint → test sequence locally before committing.
+
+### Docker
+
+`docker compose up --build` runs Postgres 17, a one-off `migrate` job (`prisma migrate deploy`, from the Dockerfile's `build` stage since the Prisma CLI is a dev dependency) and the API on `${API_PORT:-3000}`. Compose takes secrets (`JWT_SECRET`, `SEED_ADMIN_*`) from `.env` or the shell but always points the API at the `db` service; Postgres isn't published to the host. The Dockerfile's build stages are Node with bun copied in (the Nest and Prisma CLIs need `node` via their shebangs); the runtime image is `oven/bun:1.3-slim`, runs `bun dist/src/main.js` as the non-root `bun` user, and health-checks `/api/health`. `.env` is never copied into images (`.dockerignore`).
 
 ### Environment
 
@@ -104,6 +108,6 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
 - **Phase 1** — itineraries and all-or-nothing bookings. Done.
 - **Phase 2** — search and filtering. Done.
 - **Phase 3 — groundwork for the AI agent.** Done: response envelope + error codes, OpenAPI, user preferences + travelers, Idempotency-Key, refresh tokens, itinerary activity log.
-- **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting. Next: Docker, scheduled jobs (e.g. purging expired idempotency keys and refresh tokens, completing past itineraries), emails.
+- **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting, Docker. Next: scheduled jobs (e.g. purging expired idempotency keys and refresh tokens, completing past itineraries), emails.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
 - **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.
