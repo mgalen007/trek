@@ -16,6 +16,7 @@ import { TravelersModule } from './travelers/travelers.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { HealthModule } from './health/health.module';
     IdempotencyModule,
     RateLimitModule,
     HealthModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService, SeedService],

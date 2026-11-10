@@ -6,18 +6,26 @@ type Db = PrismaService | Prisma.TransactionClient;
 
 const day = (date: Date) => date.toISOString().slice(0, 10);
 
+/** The actor of events done by scheduled jobs rather than a person. */
+export const SYSTEM = null;
+
 /** Event fields for a nested `events: { create }` or `recordEvent()`. */
 export const eventData = (
-  actor: ICurrentUser,
+  actor: ICurrentUser | typeof SYSTEM,
   type: ItineraryEventType,
   details?: Prisma.InputJsonObject,
-) => ({ type, actorId: actor.id, actorRole: actor.role, details });
+) => ({
+  type,
+  actorId: actor?.id ?? null,
+  actorRole: actor?.role ?? null,
+  details,
+});
 
 // Returns the query unawaited so it can join a batch $transaction.
 export const recordEvent = (
   db: Db,
   itineraryId: string,
-  actor: ICurrentUser,
+  actor: ICurrentUser | typeof SYSTEM,
   type: ItineraryEventType,
   details?: Prisma.InputJsonObject,
 ) =>

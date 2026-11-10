@@ -13,12 +13,18 @@ export class ItineraryEventEntity {
   })
   type: ItineraryEventType;
 
-  /** Who did it; null once that account has been deleted. */
+  /**
+   * Who did it; null once that account has been deleted, or when the system
+   * did it (then actorRole is null too).
+   */
   actorId: string | null;
 
-  /** ADMIN when someone else acted on the owner's behalf. */
-  @ApiProperty({ enum: Role, enumName: 'Role' })
-  actorRole: Role;
+  /**
+   * ADMIN when someone else acted on the owner's behalf; null when the
+   * system did it (e.g. COMPLETED).
+   */
+  @ApiProperty({ enum: Role, enumName: 'Role', nullable: true })
+  actorRole: Role | null;
 
   /**
    * Facts copied at the time, so they stay readable after items or
@@ -29,6 +35,7 @@ export class ItineraryEventEntity {
    * - FLIGHT_ADDED / FLIGHT_REMOVED: `{ itemId, flightId, flightNumber, departureAt, passengers, totalPrice, currency }`
    * - CONFIRMED: `{ hotelStays, flights, totals: { <currency>: <amount> } }`
    * - CANCELLED: `{ hotelStays, flights, releasedSeats }`
+   * - COMPLETED: `{ endDate }` — by the system, the day after the trip ends
    *
    * Prices are decimal strings.
    */

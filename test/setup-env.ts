@@ -8,3 +8,6 @@ process.env.DATABASE_URL = testDatabaseUrl();
 // its own apps with low limits to test rate limiting itself.
 process.env.RATE_LIMIT_PER_MINUTE = '100000';
 process.env.AUTH_RATE_LIMIT_PER_MINUTE = '100000';
+
+// Jobs never fire mid-test; jobs.e2e-spec.ts calls them directly.
+process.env.SCHEDULED_JOBS = 'off';

@@ -16,7 +16,7 @@
     ]
   },
   "transformIgnorePatterns": [
-    "node_modules/(?!@nestjs/(config|jwt|passport)/)"
+    "node_modules/(?!@nestjs/(config|jwt|passport|schedule)/)"
   ],
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/src/$1",

@@ -29,6 +29,7 @@
     "@nestjs/jwt": "^12.0.2",
     "@nestjs/passport": "^12.0.0",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^12.0.3",
     "@nestjs/swagger": "^11",
     "@nestjs/throttler": "^6.7.1",
     "@prisma/adapter-pg": "7",
@@ -95,7 +96,7 @@
       ]
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!@nestjs/(config|jwt|passport)/)"
+      "node_modules/(?!@nestjs/(config|jwt|passport|schedule)/)"
     ],
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/src/$1",
