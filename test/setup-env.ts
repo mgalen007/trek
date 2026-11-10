@@ -11,3 +11,7 @@ process.env.AUTH_RATE_LIMIT_PER_MINUTE = '100000';
 
 // Jobs never fire mid-test; jobs.e2e-spec.ts calls them directly.
 process.env.SCHEDULED_JOBS = 'off';
+
+// Never send real email from tests, even if .env has SMTP_URL; the
+// LogMailer keeps messages in memory for assertions.
+process.env.MAIL_TRANSPORT = 'log';

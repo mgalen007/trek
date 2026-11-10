@@ -40,7 +40,7 @@ export async function createTestApp() {
   if (!db.endsWith('_test'))
     throw new Error(`Refusing to truncate non-test database "${db}"`);
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE idempotency_keys, refresh_tokens, itinerary_events, "_FlightBookingTravelers", travelers, user_preferences, itinerary_flight, itinerary_hotel, itineraries, flights, airports, hotels, destinations, users CASCADE',
+    'TRUNCATE TABLE email_outbox, idempotency_keys, refresh_tokens, itinerary_events, "_FlightBookingTravelers", travelers, user_preferences, itinerary_flight, itinerary_hotel, itineraries, flights, airports, hotels, destinations, users CASCADE',
   );
 
   const api = () => request(app.getHttpServer());

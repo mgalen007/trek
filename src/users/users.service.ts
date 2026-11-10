@@ -13,6 +13,8 @@ import type { ICurrentUser } from '../auth/types/user.types';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Role } from '../auth/types/auth.types';
 import * as bcrypt from 'bcryptjs';
+import { outboxData } from '../email/email-outbox';
+import { welcomeEmail } from '../email/templates';
 
 @Injectable()
 export class UsersService {
@@ -34,6 +36,9 @@ export class UsersService {
         passwordHash: hash,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        emails: {
+          create: outboxData(dto.email, welcomeEmail(dto.firstName)),
+        },
       },
       omit: {
         passwordHash: true,
