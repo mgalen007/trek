@@ -38,6 +38,16 @@ import {
   tripDetails,
 } from './itinerary-events';
 import { randomUUID } from 'crypto';
+import { queueEmail } from '../email/email-outbox';
+import {
+  FlightLine,
+  itineraryCancelledEmail,
+  itineraryConfirmedEmail,
+  StayLine,
+  tripSummary,
+} from '../email/templates';
+
+const day = (date: Date) => date.toISOString().slice(0, 10);
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -411,10 +421,12 @@ export class ItinerariesService {
       const stays = await tx.itineraryHotel.findMany({
         where: { itineraryId: id },
         include: { hotel: true },
+        orderBy: { checkInDate: 'asc' },
       });
       const flights = await tx.itineraryFlight.findMany({
         where: { itineraryId: id },
         include: { flight: true },
+        orderBy: { flight: { departureAt: 'asc' } },
       });
       if (!stays.length && !flights.length)
         throw new BadRequestException(
@@ -422,6 +434,8 @@ export class ItinerariesService {
         );
 
       const booked: { totalPrice: Prisma.Decimal; currency: string }[] = [];
+      const stayLines: StayLine[] = [];
+      const flightLines: FlightLine[] = [];
 
       // Each stay is marked CONFIRMED before the next is checked, so two stays
       // at the same hotel in one itinerary count against each other.
@@ -454,6 +468,14 @@ export class ItinerariesService {
           },
         });
         booked.push(price);
+        stayLines.push({
+          hotelName: stay.hotel.name,
+          checkInDate: day(stay.checkInDate),
+          checkOutDate: day(stay.checkOutDate),
+          rooms: stay.rooms,
+          totalPrice: price.totalPrice.toFixed(2),
+          currency: price.currency,
+        });
       }
 
       for (const item of flights) {
@@ -488,17 +510,39 @@ export class ItinerariesService {
           },
         });
         booked.push(price);
+        flightLines.push({
+          flightNumber: item.flight.flightNumber,
+          airline: item.flight.airline,
+          departureAt: item.flight.departureAt.toISOString(),
+          passengers: item.passengers,
+          totalPrice: price.totalPrice.toFixed(2),
+          currency: price.currency,
+        });
       }
 
       await tx.itinerary.update({
         where: { id },
         data: { status: ItineraryStatus.PLANNED },
       });
+      const totals = totalsByCurrency(booked);
       await recordEvent(tx, id, currentUser, ItineraryEventType.CONFIRMED, {
         hotelStays: stays.length,
         flights: flights.length,
-        totals: totalsByCurrency(booked),
+        totals,
       });
+      const { owner, trip } = await this.emailContext(tx, id);
+      await queueEmail(
+        tx,
+        owner.id,
+        owner.email,
+        itineraryConfirmedEmail(
+          owner.firstName,
+          trip,
+          stayLines,
+          flightLines,
+          totals,
+        ),
+      );
     });
 
     return this.findOne(id, currentUser);
@@ -539,9 +583,28 @@ export class ItinerariesService {
         flights: flights.length,
         releasedSeats: flights.reduce((sum, f) => sum + f.passengers, 0),
       });
+      const { owner, trip } = await this.emailContext(tx, id);
+      await queueEmail(
+        tx,
+        owner.id,
+        owner.email,
+        itineraryCancelledEmail(owner.firstName, trip),
+      );
     });
 
     return this.findOne(id, currentUser);
+  }
+
+  // Emails go to the itinerary's owner, also when an admin acted for them.
+  private async emailContext(tx: Prisma.TransactionClient, id: string) {
+    const itinerary = await tx.itinerary.findUniqueOrThrow({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, firstName: true } },
+        destination: { select: { name: true } },
+      },
+    });
+    return { owner: itinerary.user, trip: tripSummary(itinerary) };
   }
 
   // Other users' itineraries are reported as missing rather than forbidden,

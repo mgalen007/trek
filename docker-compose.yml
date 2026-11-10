@@ -24,6 +24,13 @@ services:
       timeout: 5s
       retries: 10
 
+  # Catches every email the API sends; read them at http://localhost:8025.
+  # Point SMTP_URL at a real server to send for real instead.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+
   migrate:
     build:
       context: .
@@ -54,9 +61,13 @@ services:
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUST_PROXY: ${TRUST_PROXY:-}
+      SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
+      MAIL_FROM: ${MAIL_FROM:-Trek <no-reply@trek.local>}
     depends_on:
       migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

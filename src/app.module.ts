@@ -17,6 +17,7 @@ import { IdempotencyModule } from './idempotency/idempotency.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { HealthModule } from './health/health.module';
 import { JobsModule } from './jobs/jobs.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { JobsModule } from './jobs/jobs.module';
     RateLimitModule,
     HealthModule,
     JobsModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService, SeedService],

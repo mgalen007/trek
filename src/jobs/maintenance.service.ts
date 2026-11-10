@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { JobRunner } from './job-runner.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ItineraryEventType,
@@ -9,6 +9,10 @@ import {
 import { KEY_TTL_MS } from '../idempotency/idempotency.service';
 import { recordEvent, SYSTEM } from '../itineraries/itinerary-events';
 import { toDateOnly } from 'common/helpers/date.helpers';
+import { queueEmail } from '../email/email-outbox';
+import { itineraryCompletedEmail, tripSummary } from '../email/templates';
+
+const day = (date: Date) => date.toISOString().slice(0, 10);
 
 // Revoked refresh tokens are kept a day for troubleshooting; they're already
 // unusable, so dropping them later changes nothing for clients.
@@ -20,17 +24,13 @@ const COMPLETION_BATCH = 200;
 /**
  * Housekeeping on a schedule. Every job is safe to run concurrently on
  * several instances (deletes and conditional updates), and each method can
- * be called directly, e.g. from tests. SCHEDULED_JOBS=off disables the
- * schedule (the e2e tests do this).
+ * be called directly, e.g. from tests.
  */
 @Injectable()
 export class MaintenanceService {
-  private readonly logger = new Logger(MaintenanceService.name);
-  private readonly running = new Set<string>();
-
   constructor(
     private prisma: PrismaService,
-    private config: ConfigService,
+    private jobs: JobRunner,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR, {
@@ -95,45 +95,39 @@ export class MaintenanceService {
     for (;;) {
       const due = await this.prisma.itinerary.findMany({
         where: { status: ItineraryStatus.PLANNED, endDate: { lt: today } },
-        select: { id: true, endDate: true },
+        include: {
+          user: { select: { id: true, email: true, firstName: true } },
+          destination: { select: { name: true } },
+        },
         take: COMPLETION_BATCH,
       });
       if (!due.length) return completed;
 
-      for (const { id, endDate } of due) {
+      for (const trip of due) {
         await this.prisma.$transaction(async (tx) => {
           // Conditional, so a concurrent cancel or another instance's run
-          // wins cleanly and no second event is written.
+          // wins cleanly and no second event or email is written.
           const { count } = await tx.itinerary.updateMany({
-            where: { id, status: ItineraryStatus.PLANNED },
+            where: { id: trip.id, status: ItineraryStatus.PLANNED },
             data: { status: ItineraryStatus.COMPLETED },
           });
           if (!count) return;
-          await recordEvent(tx, id, SYSTEM, ItineraryEventType.COMPLETED, {
-            endDate: endDate.toISOString().slice(0, 10),
+          await recordEvent(tx, trip.id, SYSTEM, ItineraryEventType.COMPLETED, {
+            endDate: day(trip.endDate),
           });
+          await queueEmail(
+            tx,
+            trip.user.id,
+            trip.user.email,
+            itineraryCompletedEmail(trip.user.firstName, tripSummary(trip)),
+          );
           completed++;
         });
       }
     }
   }
 
-  private async run(name: string, job: () => Promise<number>) {
-    if (this.config.get<string>('SCHEDULED_JOBS') === 'off') return;
-    // A slow run shouldn't overlap with the next tick.
-    if (this.running.has(name)) return;
-    this.running.add(name);
-    const started = Date.now();
-    try {
-      const count = await job();
-      if (count)
-        this.logger.log(
-          `${name}: ${count} row(s) in ${Date.now() - started}ms`,
-        );
-    } catch (err) {
-      this.logger.error(`${name} failed: ${String(err)}`);
-    } finally {
-      this.running.delete(name);
-    }
+  private run(name: string, job: () => Promise<number>) {
+    return this.jobs.run(name, job);
   }
 }
