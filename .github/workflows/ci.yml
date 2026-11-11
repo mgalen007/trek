@@ -97,14 +97,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Builds both images, migrates a fresh database and waits for the API's
-      # health check to pass.
-      - run: docker compose up --build --detach --wait --wait-timeout 180
+      # The agent only needs these to start; its health check never calls the model.
+      - name: Agent settings
+        run: printf 'OPENROUTER_API_KEY=ci-dummy-key\nAGENT_MODEL=ci/no-model\n' > agent/.env
 
-      - name: API is ready and serving
+      # Builds the images, migrates and seeds a fresh database, and waits for
+      # the API's and the agent's health checks to pass.
+      - run: docker compose up --build --detach --wait --wait-timeout 300
+
+      - name: API and agent are ready and serving
         run: |
           curl --fail --silent http://localhost:3000/api/health/ready
           curl --fail --silent --output /dev/null http://localhost:3000/api/docs-json
+          curl --fail --silent http://localhost:8000/health
+          # The agent reaches the API over the compose network: a bogus token
+          # is rejected by the API itself (401), not a connection error (502).
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST http://localhost:8000/chat -H 'Authorization: Bearer bogus' \
+            -H 'Content-Type: application/json' -d '{"message":"hi"}')" = 401
 
       - name: Logs on failure
         if: failure()
