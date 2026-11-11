@@ -259,6 +259,8 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 - **The AI agent** ([agent/](agent/README.md)): a first version plans trips through this API (search, drafts, quotes; the user confirms). It runs in Docker Compose with the rest of the stack. Next: streaming replies, shared conversation storage.
 - **Then:** real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
+What each release contains is in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 Not licensed for reuse (`UNLICENSED` in `package.json`).

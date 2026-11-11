@@ -127,6 +127,10 @@ Python 3.13, **uv**, PydanticAI 2, FastAPI. A model on **OpenRouter** through Py
 
 Branch off an up-to-date `main` (verify against GitHub — `git fetch https://github.com/mgalen007/trek.git main`, since SSH may be unavailable), make small Conventional Commits (`feat:`, `fix:`, `test:`, `ci:`, `refactor:`, `style:`, `docs:`; `feat!:` for breaking changes), and stop. The maintainer pushes, opens the PR, reviews and merges. One branch/PR per roadmap item. Schema changes usually land as their own commit (`feat: schema for …`) before the feature commit.
 
+## Releases
+
+One version for the whole repo (API and agent), [SemVer](https://semver.org/); `0.x` means the API may still break between minor versions. To prepare a release, on a `release/vX.Y.Z` branch: set `version` in `package.json` (the OpenAPI spec's `info.version` reads it at startup, and `test/openapi.e2e-spec.ts` checks they match) and in `agent/pyproject.toml` (then `uv lock` in `agent/`), and add a dated section to `CHANGELOG.md` (Keep a Changelog: what's new by area, plus known limitations). The maintainer merges, then tags `vX.Y.Z` on `main` and creates the GitHub Release from the changelog section.
+
 ## Roadmap
 
 - **Phase 1** — itineraries and all-or-nothing bookings. Done.
