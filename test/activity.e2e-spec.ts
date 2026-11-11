@@ -135,7 +135,12 @@ describe('Itinerary activity log (e2e)', () => {
     await as(alice)
       .post(`/api/itineraries/${tripId}/flights`, { flightId, passengers: 2 })
       .expect(201);
-    await as(alice).post(`/api/itineraries/${tripId}/confirm`).expect(200);
+    await as(alice)
+      .post(
+        `/api/itineraries/${tripId}/confirm`,
+        await ctx.reviewed(alice, tripId),
+      )
+      .expect(200);
     await as(alice).post(`/api/itineraries/${tripId}/cancel`).expect(200);
 
     const { data, pagination } = await events(alice, tripId);
@@ -218,7 +223,9 @@ describe('Itinerary activity log (e2e)', () => {
 
   it('does not record actions that failed', async () => {
     const trip = await newTrip(alice);
-    await as(alice).post(`/api/itineraries/${trip}/confirm`).expect(400);
+    await as(alice)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(alice, trip))
+      .expect(400);
     await as(alice)
       .post(`/api/itineraries/${trip}/hotels`, {
         hotelId,

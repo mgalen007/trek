@@ -56,7 +56,9 @@ describe('Privacy & data integrity (e2e)', () => {
       await as(token)
         .post(`/api/itineraries/${trip}/flights`, { flightId, passengers })
         .expect(201);
-    await as(token).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(token)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(token, trip))
+      .expect(200);
     return trip;
   };
   const flight = async () =>

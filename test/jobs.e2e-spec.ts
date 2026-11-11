@@ -45,7 +45,9 @@ describe('Scheduled jobs (e2e)', () => {
         rooms: 1,
       })
       .expect(201);
-    await as(user).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(user)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(user, trip))
+      .expect(200);
     await ctx.prisma.itinerary.update({
       where: { id: trip },
       data: { startDate: utcDay(startOffset), endDate: utcDay(endOffset) },

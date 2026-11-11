@@ -162,19 +162,22 @@ describe('Idempotency keys (e2e)', () => {
         .expect(201);
     });
 
-    const confirm = (key: string) =>
+    // Retries resend the exact same body: the reviewed version and totals.
+    const confirm = (key: string, body: object) =>
       api()
         .post(`/api/itineraries/${trip}/confirm`)
         .set(auth(alice))
-        .set('Idempotency-Key', key);
+        .set('Idempotency-Key', key)
+        .send(body);
 
     it('reserves seats once however many times it is retried', async () => {
       const key = randomUUID();
       const seats = await seatsLeft();
+      const body = await ctx.reviewed(alice, trip);
 
-      await confirm(key).expect(200);
-      const retry = await confirm(key).expect(200);
-      await confirm(key).expect(200);
+      await confirm(key, body).expect(200);
+      const retry = await confirm(key, body).expect(200);
+      await confirm(key, body).expect(200);
 
       expect(retry.body.data.status).toBe('PLANNED');
       expect(await seatsLeft()).toBe(seats - 2);

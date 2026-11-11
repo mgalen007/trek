@@ -153,6 +153,7 @@ describe('Search & discovery (e2e)', () => {
       .api()
       .post(`/api/itineraries/${trip.body.data.id}/confirm`)
       .set(auth(user))
+      .send(await ctx.reviewed(user, trip.body.data.id as string))
       .expect(200);
   });
 

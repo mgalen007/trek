@@ -286,6 +286,7 @@ describe('Preferences & travelers (e2e)', () => {
       await api()
         .post(`/api/itineraries/${trip}/confirm`)
         .set(auth(alice))
+        .send(await ctx.reviewed(alice, trip))
         .expect(200);
       await api()
         .delete(`/api/travelers/${benId}`)
