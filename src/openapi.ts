@@ -1,6 +1,20 @@
 import { HttpStatus, INestApplication } from '@nestjs/common';
 import { DocumentBuilder, getSchemaPath, SwaggerModule } from '@nestjs/swagger';
 import { ErrorResponseDto } from '../common/http/api-response.dto';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// The release version, so the spec and the release tag agree. Read from the
+// working directory's package.json (the repo root, or /app in Docker): a
+// relative import would point elsewhere once compiled into dist/.
+const packageVersion = () => {
+  try {
+    const pkg = readFileSync(join(process.cwd(), 'package.json'), 'utf8');
+    return (JSON.parse(pkg) as { version: string }).version;
+  } catch {
+    return 'unknown';
+  }
+};
 
 export const OPENAPI_PATH = 'api/docs';
 
@@ -27,7 +41,7 @@ export function createOpenApiDocument(app: INestApplication) {
         'Requests are rate limited per user (per IP when anonymous). A 429 `TOO_MANY_REQUESTS` carries a `Retry-After` header and `details.retryAfterSeconds`.',
       ].join('\n'),
     )
-    .setVersion('1.0')
+    .setVersion(packageVersion())
     .addBearerAuth()
     .build();
 
