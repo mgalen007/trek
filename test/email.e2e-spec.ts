@@ -124,7 +124,9 @@ describe('Emails (e2e)', () => {
 
   it('emails the owner a summary when a trip is confirmed', async () => {
     const trip = await draft(user, 'Gorillas <script>');
-    await as(user).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(user)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(user, trip))
+      .expect(200);
 
     const [email] = await queued('ITINERARY_CONFIRMED');
     expect(email).toMatchObject({
@@ -142,7 +144,9 @@ describe('Emails (e2e)', () => {
 
   it('emails the owner, not the admin, when an admin acts for them', async () => {
     const trip = await draft(user, 'Booked by support');
-    await as(admin).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(admin)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(admin, trip))
+      .expect(200);
 
     const emails = await queued('ITINERARY_CONFIRMED');
     expect(emails.at(-1)).toMatchObject({
@@ -160,7 +164,9 @@ describe('Emails (e2e)', () => {
       data: { rooms: 3 },
     });
 
-    await as(user).post(`/api/itineraries/${trip}/confirm`).expect(409);
+    await as(user)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(user, trip))
+      .expect(409);
 
     expect(await queued('ITINERARY_CONFIRMED')).toHaveLength(before);
   });

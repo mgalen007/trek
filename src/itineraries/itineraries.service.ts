@@ -25,6 +25,11 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
 import { AddFlightDto } from './dto/add-flight.dto';
+import { ConfirmItineraryDto } from './dto/confirm-itinerary.dto';
+import type {
+  QuoteFlightEntity,
+  QuoteHotelStayEntity,
+} from './entities/itinerary-quote.entity';
 import {
   ItineraryEventQueryParams,
   ItineraryQueryParams,
@@ -56,6 +61,22 @@ const MAX_TX_ATTEMPTS = 3;
 
 const nightsBetween = (checkIn: Date, checkOut: Date) =>
   Math.round((checkOut.getTime() - checkIn.getTime()) / DAY_MS);
+
+// Same currencies and amounts, compared as decimals ("300" equals "300.00").
+const sameTotals = (
+  expected: Record<string, string>,
+  current: Record<string, string>,
+) => {
+  const currencies = Object.keys(current);
+  return (
+    currencies.length === Object.keys(expected).length &&
+    currencies.every(
+      (currency) =>
+        expected[currency] !== undefined &&
+        new Prisma.Decimal(expected[currency]).equals(current[currency]),
+    )
+  );
+};
 
 // Postgres serialization failures (40001) surface as P2034 from the query
 // engine, but as a DriverAdapterError when they happen at commit via adapter-pg.
@@ -186,25 +207,18 @@ export class ItinerariesService {
       startDate,
       endDate,
     });
-    await this.prisma.$transaction([
-      this.prisma.itinerary.update({
-        where: { id },
-        data: { name: dto.name, startDate, endDate },
-      }),
-      ...(Object.keys(changes).length
-        ? [
-            recordEvent(
-              this.prisma,
-              id,
-              currentUser,
-              ItineraryEventType.UPDATED,
-              {
-                changes,
-              },
-            ),
-          ]
-        : []),
-    ]);
+    // Saving without changes isn't a change: no event, no new version.
+    if (Object.keys(changes).length)
+      await this.prisma.$transaction(async (tx) => {
+        await this.touchDraft(tx, id);
+        await tx.itinerary.update({
+          where: { id },
+          data: { name: dto.name, startDate, endDate },
+        });
+        await recordEvent(tx, id, currentUser, ItineraryEventType.UPDATED, {
+          changes,
+        });
+      });
 
     return this.findOne(id, currentUser);
   }
@@ -295,16 +309,17 @@ export class ItinerariesService {
       totalPrice: hotel.nightlyRate.mul(nights * dto.rooms),
       currency: hotel.currency,
     };
-    await this.prisma.$transaction([
-      this.prisma.itineraryHotel.create({ data: stay }),
-      recordEvent(
-        this.prisma,
+    await this.prisma.$transaction(async (tx) => {
+      await this.touchDraft(tx, id);
+      await tx.itineraryHotel.create({ data: stay });
+      await recordEvent(
+        tx,
         id,
         currentUser,
         ItineraryEventType.HOTEL_ADDED,
         stayDetails(stay, hotel.name),
-      ),
-    ]);
+      );
+    });
 
     return this.findOne(id, currentUser);
   }
@@ -319,16 +334,17 @@ export class ItinerariesService {
     });
     if (!stay) throw new NotFoundException('Hotel stay not found');
 
-    await this.prisma.$transaction([
-      this.prisma.itineraryHotel.delete({ where: { id: itemId } }),
-      recordEvent(
-        this.prisma,
+    await this.prisma.$transaction(async (tx) => {
+      await this.touchDraft(tx, id);
+      await tx.itineraryHotel.delete({ where: { id: itemId } });
+      await recordEvent(
+        tx,
         id,
         currentUser,
         ItineraryEventType.HOTEL_REMOVED,
         stayDetails(stay, stay.hotel.name),
-      ),
-    ]);
+      );
+    });
 
     return this.findOne(id, currentUser);
   }
@@ -374,23 +390,24 @@ export class ItinerariesService {
       totalPrice: flight.price.mul(passengers),
       currency: flight.currency,
     };
-    await this.prisma.$transaction([
-      this.prisma.itineraryFlight.create({
+    await this.prisma.$transaction(async (tx) => {
+      await this.touchDraft(tx, id);
+      await tx.itineraryFlight.create({
         data: {
           ...item,
           travelers: {
             connect: travelerIds.map((travelerId) => ({ id: travelerId })),
           },
         },
-      }),
-      recordEvent(
-        this.prisma,
+      });
+      await recordEvent(
+        tx,
         id,
         currentUser,
         ItineraryEventType.FLIGHT_ADDED,
         flightDetails(item, flight),
-      ),
-    ]);
+      );
+    });
 
     return this.findOne(id, currentUser);
   }
@@ -407,48 +424,159 @@ export class ItinerariesService {
     });
     if (!item) throw new NotFoundException('Flight booking not found');
 
-    await this.prisma.$transaction([
-      this.prisma.itineraryFlight.delete({ where: { id: itemId } }),
-      recordEvent(
-        this.prisma,
+    await this.prisma.$transaction(async (tx) => {
+      await this.touchDraft(tx, id);
+      await tx.itineraryFlight.delete({ where: { id: itemId } });
+      await recordEvent(
+        tx,
         id,
         currentUser,
         ItineraryEventType.FLIGHT_REMOVED,
         flightDetails(item, item.flight),
-      ),
-    ]);
+      );
+    });
 
     return this.findOne(id, currentUser);
   }
 
-  // Reserves every hotel stay and flight at once, or nothing at all.
-  async confirm(id: string, currentUser: ICurrentUser) {
+  /**
+   * What confirming would do right now: each item at current prices, the
+   * totals to send back as expectedTotals, the version to send as
+   * expectedVersion, and anything that would make confirm fail. Reserves
+   * nothing.
+   */
+  async quote(id: string, currentUser: ICurrentUser) {
+    const itinerary = await this.getOwnedOrFail(id, currentUser);
+    const items = await this.loadItems(this.prisma, id);
+    const priced = this.priceItems(items);
+    const issues: { code: ErrorCode; itemId?: string; message: string }[] = [];
+    const isDraft = itinerary.status === ItineraryStatus.DRAFT;
+
+    if (!isDraft)
+      issues.push({
+        code: ErrorCode.INVALID_STATUS,
+        message: `Itinerary is ${itinerary.status}; only drafts can be confirmed`,
+      });
+    if (!items.stays.length && !items.flights.length)
+      issues.push({
+        code: ErrorCode.BAD_REQUEST,
+        message: 'Add at least one hotel stay or flight before confirming',
+      });
+
+    const hotelStays: QuoteHotelStayEntity[] = [];
+    for (const { stay, nightlyRate, totalPrice, currency } of priced.stays) {
+      // Checked one by one: two stays of this trip at the same hotel can
+      // still conflict with each other at confirm.
+      const available = isDraft
+        ? await this.inventory.availableHotelRooms(
+            stay.hotelId,
+            stay.checkInDate,
+            stay.checkOutDate,
+          )
+        : stay.rooms;
+      if (stay.rooms > available)
+        issues.push({
+          code: ErrorCode.ROOMS_UNAVAILABLE,
+          itemId: stay.id,
+          message: `Only ${available} room(s) left at ${stay.hotel.name} for those dates`,
+        });
+      hotelStays.push({
+        itemId: stay.id,
+        hotelId: stay.hotelId,
+        hotelName: stay.hotel.name,
+        checkInDate: day(stay.checkInDate),
+        checkOutDate: day(stay.checkOutDate),
+        rooms: stay.rooms,
+        nightlyRate: nightlyRate.toFixed(2),
+        totalPrice: totalPrice.toFixed(2),
+        currency,
+        priceChanged: !totalPrice.equals(stay.totalPrice),
+      });
+    }
+
+    const flights: QuoteFlightEntity[] = [];
+    for (const { item, unitPrice, totalPrice, currency } of priced.flights) {
+      if (isDraft && item.flight.departureAt <= new Date())
+        issues.push({
+          code: ErrorCode.BAD_REQUEST,
+          itemId: item.id,
+          message: `Flight ${item.flight.flightNumber} has already departed`,
+        });
+      else if (isDraft && item.passengers > item.flight.availableSeats)
+        issues.push({
+          code: ErrorCode.SEATS_UNAVAILABLE,
+          itemId: item.id,
+          message: `Only ${item.flight.availableSeats} seat(s) left on flight ${item.flight.flightNumber}`,
+        });
+      flights.push({
+        itemId: item.id,
+        flightId: item.flightId,
+        flightNumber: item.flight.flightNumber,
+        airline: item.flight.airline,
+        departureAt: item.flight.departureAt,
+        passengers: item.passengers,
+        unitPrice: unitPrice.toFixed(2),
+        totalPrice: totalPrice.toFixed(2),
+        currency,
+        priceChanged: !totalPrice.equals(item.totalPrice),
+      });
+    }
+
+    return {
+      itineraryId: id,
+      status: itinerary.status,
+      version: itinerary.version,
+      bookable: issues.length === 0,
+      totals: priced.totals,
+      hotelStays,
+      flights,
+      issues,
+    };
+  }
+
+  // Reserves every hotel stay and flight at once, or nothing at all, and
+  // only if the trip is still the version and price the user reviewed.
+  async confirm(
+    id: string,
+    currentUser: ICurrentUser,
+    expected: ConfirmItineraryDto,
+  ) {
     await this.inSerializableTx(async (tx) => {
       const itinerary = await this.getOwnedOrFail(id, currentUser, tx);
       this.assertStatus(itinerary, ItineraryStatus.DRAFT);
+      if (itinerary.version !== expected.expectedVersion)
+        throw new ConflictException(
+          apiError(
+            ErrorCode.ITINERARY_CHANGED,
+            `Itinerary changed since version ${expected.expectedVersion} (now ${itinerary.version}); review it again`,
+            {
+              expectedVersion: expected.expectedVersion,
+              currentVersion: itinerary.version,
+            },
+          ),
+        );
 
-      const stays = await tx.itineraryHotel.findMany({
-        where: { itineraryId: id },
-        include: { hotel: true },
-        orderBy: { checkInDate: 'asc' },
-      });
-      const flights = await tx.itineraryFlight.findMany({
-        where: { itineraryId: id },
-        include: { flight: true },
-        orderBy: { flight: { departureAt: 'asc' } },
-      });
-      if (!stays.length && !flights.length)
+      const items = await this.loadItems(tx, id);
+      if (!items.stays.length && !items.flights.length)
         throw new BadRequestException(
           'Add at least one hotel stay or flight before confirming',
         );
-
-      const booked: { totalPrice: Prisma.Decimal; currency: string }[] = [];
-      const stayLines: StayLine[] = [];
-      const flightLines: FlightLine[] = [];
+      const priced = this.priceItems(items);
+      if (!sameTotals(expected.expectedTotals, priced.totals))
+        throw new ConflictException(
+          apiError(
+            ErrorCode.PRICE_CHANGED,
+            'Prices changed since the quote; review the new total',
+            {
+              expectedTotals: expected.expectedTotals,
+              currentTotals: priced.totals,
+            },
+          ),
+        );
 
       // Each stay is marked CONFIRMED before the next is checked, so two stays
       // at the same hotel in one itinerary count against each other.
-      for (const stay of stays) {
+      for (const { stay, nightlyRate, totalPrice, currency } of priced.stays) {
         const available = await this.inventory.availableHotelRooms(
           stay.hotelId,
           stay.checkInDate,
@@ -462,32 +590,18 @@ export class ItinerariesService {
               `Only ${available} room(s) left at ${stay.hotel.name} for those dates`,
             ),
           );
-
-        const nights = nightsBetween(stay.checkInDate, stay.checkOutDate);
-        const price = {
-          totalPrice: stay.hotel.nightlyRate.mul(nights * stay.rooms),
-          currency: stay.hotel.currency,
-        };
         await tx.itineraryHotel.update({
           where: { id: stay.id },
           data: {
             status: BookingStatus.CONFIRMED,
-            nightlyRate: stay.hotel.nightlyRate,
-            ...price,
+            nightlyRate,
+            totalPrice,
+            currency,
           },
-        });
-        booked.push(price);
-        stayLines.push({
-          hotelName: stay.hotel.name,
-          checkInDate: day(stay.checkInDate),
-          checkOutDate: day(stay.checkOutDate),
-          rooms: stay.rooms,
-          totalPrice: price.totalPrice.toFixed(2),
-          currency: price.currency,
         });
       }
 
-      for (const item of flights) {
+      for (const { item, unitPrice, totalPrice, currency } of priced.flights) {
         if (item.flight.departureAt <= new Date())
           throw new BadRequestException(
             `Flight ${item.flight.flightNumber} has already departed`,
@@ -505,38 +619,42 @@ export class ItinerariesService {
               `Not enough seats left on flight ${item.flight.flightNumber}`,
             ),
           );
-
-        const price = {
-          totalPrice: item.flight.price.mul(item.passengers),
-          currency: item.flight.currency,
-        };
         await tx.itineraryFlight.update({
           where: { id: item.id },
           data: {
             status: BookingStatus.CONFIRMED,
-            unitPrice: item.flight.price,
-            ...price,
+            unitPrice,
+            totalPrice,
+            currency,
           },
-        });
-        booked.push(price);
-        flightLines.push({
-          flightNumber: item.flight.flightNumber,
-          airline: item.flight.airline,
-          departureAt: item.flight.departureAt.toISOString(),
-          passengers: item.passengers,
-          totalPrice: price.totalPrice.toFixed(2),
-          currency: price.currency,
         });
       }
 
+      const stayLines: StayLine[] = priced.stays.map((s) => ({
+        hotelName: s.stay.hotel.name,
+        checkInDate: day(s.stay.checkInDate),
+        checkOutDate: day(s.stay.checkOutDate),
+        rooms: s.stay.rooms,
+        totalPrice: s.totalPrice.toFixed(2),
+        currency: s.currency,
+      }));
+      const flightLines: FlightLine[] = priced.flights.map((f) => ({
+        flightNumber: f.item.flight.flightNumber,
+        airline: f.item.flight.airline,
+        departureAt: f.item.flight.departureAt.toISOString(),
+        passengers: f.item.passengers,
+        totalPrice: f.totalPrice.toFixed(2),
+        currency: f.currency,
+      }));
+      const { totals } = priced;
+
       await tx.itinerary.update({
         where: { id },
-        data: { status: ItineraryStatus.PLANNED },
+        data: { status: ItineraryStatus.PLANNED, version: { increment: 1 } },
       });
-      const totals = totalsByCurrency(booked);
       await recordEvent(tx, id, currentUser, ItineraryEventType.CONFIRMED, {
-        hotelStays: stays.length,
-        flights: flights.length,
+        hotelStays: items.stays.length,
+        flights: items.flights.length,
         totals,
       });
       const { owner, trip } = await this.emailContext(tx, id);
@@ -585,7 +703,7 @@ export class ItinerariesService {
       });
       await tx.itinerary.update({
         where: { id },
-        data: { status: ItineraryStatus.CANCELLED },
+        data: { status: ItineraryStatus.CANCELLED, version: { increment: 1 } },
       });
       await recordEvent(tx, id, currentUser, ItineraryEventType.CANCELLED, {
         hotelStays,
@@ -602,6 +720,63 @@ export class ItinerariesService {
     });
 
     return this.findOne(id, currentUser);
+  }
+
+  // Every change to a draft goes through here, first thing in its
+  // transaction: it bumps the version and re-checks DRAFT under the row
+  // lock, so a change can't slip into a trip that was confirmed meanwhile.
+  private async touchDraft(tx: Prisma.TransactionClient, id: string) {
+    const { count } = await tx.itinerary.updateMany({
+      where: { id, status: ItineraryStatus.DRAFT },
+      data: { version: { increment: 1 } },
+    });
+    if (!count)
+      throw new ConflictException(
+        apiError(ErrorCode.INVALID_STATUS, 'Itinerary is no longer a DRAFT'),
+      );
+  }
+
+  private async loadItems(db: Db, id: string) {
+    const [stays, flights] = await Promise.all([
+      db.itineraryHotel.findMany({
+        where: { itineraryId: id },
+        include: { hotel: true },
+        orderBy: { checkInDate: 'asc' },
+      }),
+      db.itineraryFlight.findMany({
+        where: { itineraryId: id },
+        include: { flight: true },
+        orderBy: { flight: { departureAt: 'asc' } },
+      }),
+    ]);
+    return { stays, flights };
+  }
+
+  // Items at current catalogue prices: what confirm charges and quote shows.
+  private priceItems({
+    stays,
+    flights,
+  }: Awaited<ReturnType<ItinerariesService['loadItems']>>) {
+    const pricedStays = stays.map((stay) => {
+      const nights = nightsBetween(stay.checkInDate, stay.checkOutDate);
+      return {
+        stay,
+        nightlyRate: stay.hotel.nightlyRate,
+        totalPrice: stay.hotel.nightlyRate.mul(nights * stay.rooms),
+        currency: stay.hotel.currency,
+      };
+    });
+    const pricedFlights = flights.map((item) => ({
+      item,
+      unitPrice: item.flight.price,
+      totalPrice: item.flight.price.mul(item.passengers),
+      currency: item.flight.currency,
+    }));
+    return {
+      stays: pricedStays,
+      flights: pricedFlights,
+      totals: totalsByCurrency([...pricedStays, ...pricedFlights]),
+    };
   }
 
   // Emails go to the itinerary's owner, also when an admin acted for them.

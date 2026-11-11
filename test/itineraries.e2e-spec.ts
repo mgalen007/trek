@@ -269,6 +269,7 @@ describe('Itineraries (e2e)', () => {
       const res = await api()
         .post(`/api/itineraries/${aliceTrip}/confirm`)
         .set(auth(alice))
+        .send(await ctx.reviewed(alice, aliceTrip))
         .expect(200);
 
       expect(res.body.data.status).toBe('PLANNED');
@@ -281,6 +282,7 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${bobTrip}/confirm`)
         .set(auth(bob))
+        .send(await ctx.reviewed(bob, bobTrip))
         .expect(409)
         .expect(hasCode('ROOMS_UNAVAILABLE'));
       await api()
@@ -322,6 +324,7 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${bobTrip}/confirm`)
         .set(auth(bob))
+        .send(await ctx.reviewed(bob, bobTrip))
         .expect(409)
         .expect(hasCode('SEATS_UNAVAILABLE'));
 
@@ -369,6 +372,7 @@ describe('Itineraries (e2e)', () => {
       await api()
         .post(`/api/itineraries/${bobTrip}/confirm`)
         .set(auth(bob))
+        .send(await ctx.reviewed(bob, bobTrip))
         .expect(200);
       expect(await seatsLeft()).toBe(1);
     });
@@ -445,9 +449,15 @@ describe('Itineraries (e2e)', () => {
           .expect(201);
       }
 
+      const bodies = await Promise.all(
+        trips.map((trip, i) => ctx.reviewed(tokens[i], trip)),
+      );
       const results = await Promise.all(
         trips.map((trip, i) =>
-          api().post(`/api/itineraries/${trip}/confirm`).set(auth(tokens[i])),
+          api()
+            .post(`/api/itineraries/${trip}/confirm`)
+            .set(auth(tokens[i]))
+            .send(bodies[i]),
         ),
       );
 

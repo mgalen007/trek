@@ -61,5 +61,19 @@ export async function createTestApp() {
     return (res.body as { data: { accessToken: string } }).data.accessToken;
   };
 
-  return { app, prisma, api, signUp };
+  // What confirm needs, read from the quote the way the web app does:
+  // `.send(await ctx.reviewed(token, tripId))`.
+  const reviewed = async (token: string, tripId: string) => {
+    const res = await api()
+      .get(`/api/itineraries/${tripId}/quote`)
+      .set({ Authorization: `Bearer ${token}` });
+    const quote = (res.body as { data?: { version: number; totals: object } })
+      .data;
+    return {
+      expectedVersion: quote?.version ?? 1,
+      expectedTotals: quote?.totals ?? {},
+    };
+  };
+
+  return { app, prisma, api, signUp, reviewed };
 }

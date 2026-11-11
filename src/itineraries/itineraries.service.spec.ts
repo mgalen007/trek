@@ -30,10 +30,16 @@ const writeConflict = () =>
     cause: { kind: 'TransactionWriteConflict', originalCode: '40001' },
   });
 
+const reviewed = { expectedVersion: 1, expectedTotals: {} };
+
 describe('ItinerariesService', () => {
   let prisma: {
     $transaction: jest.Mock;
-    itinerary: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock };
+    itinerary: {
+      findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+      updateMany: jest.Mock;
+    };
     hotel: { findUnique: jest.Mock };
     itineraryHotel: { create: jest.Mock };
     itineraryEvent: { create: jest.Mock };
@@ -43,10 +49,16 @@ describe('ItinerariesService', () => {
 
   beforeEach(() => {
     prisma = {
-      $transaction: jest.fn().mockResolvedValue(undefined),
+      // Interactive transactions run against the same mocks.
+      $transaction: jest.fn((arg: unknown) =>
+        typeof arg === 'function'
+          ? (arg as (tx: unknown) => Promise<unknown>)(prisma)
+          : Promise.resolve(undefined),
+      ),
       itinerary: {
         findUnique: jest.fn().mockResolvedValue(draft),
         findUniqueOrThrow: jest.fn().mockResolvedValue(detail),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       hotel: { findUnique: jest.fn() },
       itineraryHotel: { create: jest.fn() },
@@ -84,7 +96,7 @@ describe('ItinerariesService', () => {
         .mockRejectedValueOnce(writeConflict())
         .mockResolvedValueOnce(undefined);
 
-      await service.confirm('trip', alice);
+      await service.confirm('trip', alice, reviewed);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
       expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
@@ -102,7 +114,7 @@ describe('ItinerariesService', () => {
         )
         .mockResolvedValueOnce(undefined);
 
-      await service.confirm('trip', alice);
+      await service.confirm('trip', alice, reviewed);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     });
@@ -110,9 +122,9 @@ describe('ItinerariesService', () => {
     it('gives up with 409 after repeated conflicts', async () => {
       prisma.$transaction.mockRejectedValue(writeConflict());
 
-      await expect(service.confirm('trip', alice)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      await expect(
+        service.confirm('trip', alice, reviewed),
+      ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.$transaction).toHaveBeenCalledTimes(3);
     });
 
@@ -120,7 +132,7 @@ describe('ItinerariesService', () => {
       const boom = new Error('boom');
       prisma.$transaction.mockRejectedValue(boom);
 
-      await expect(service.confirm('trip', alice)).rejects.toBe(boom);
+      await expect(service.confirm('trip', alice, reviewed)).rejects.toBe(boom);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
@@ -161,12 +173,16 @@ describe('ItinerariesService', () => {
       expect(data.currency).toBe('USD');
     });
 
-    it('logs the stay in the same transaction', async () => {
+    it('bumps the version and logs the stay in one transaction', async () => {
       prisma.hotel.findUnique.mockResolvedValue(hotel);
-      prisma.itineraryHotel.create.mockReturnValue('create stay');
-      prisma.itineraryEvent.create.mockReturnValue('log stay');
 
       await service.addHotel('trip', alice, stay);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.itinerary.updateMany).toHaveBeenCalledWith({
+        where: { id: 'trip', status: 'DRAFT' },
+        data: { version: { increment: 1 } },
+      });
 
       const [{ data: item }] = prisma.itineraryHotel.create.mock.calls[0] as [
         { data: { id: string } },
@@ -190,10 +206,17 @@ describe('ItinerariesService', () => {
           },
         },
       });
-      expect(prisma.$transaction).toHaveBeenCalledWith([
-        'create stay',
-        'log stay',
-      ]);
+    });
+
+    it('adds nothing if the trip was confirmed in the meantime', async () => {
+      prisma.hotel.findUnique.mockResolvedValue(hotel);
+      // The DRAFT re-check under the row lock finds it confirmed.
+      prisma.itinerary.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.addHotel('trip', alice, stay),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.itineraryHotel.create).not.toHaveBeenCalled();
     });
 
     it('rejects hotels in another destination', async () => {

@@ -127,14 +127,16 @@ describe('Agent tokens (e2e)', () => {
     const trip = await draftWithHotel(agent);
 
     await as(agent)
-      .post(`/api/itineraries/${trip}/confirm`)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(agent, trip))
       .expect(403)
       .expect(notAllowed);
     expect(
       (await as(user).get(`/api/itineraries/${trip}`)).body.data.status,
     ).toBe('DRAFT');
 
-    await as(user).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(user)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(user, trip))
+      .expect(200);
     await as(agent)
       .post(`/api/itineraries/${trip}/cancel`)
       .expect(403)
@@ -151,7 +153,9 @@ describe('Agent tokens (e2e)', () => {
     await as(agent).delete(`/api/itineraries/${draft}`).expect(200);
 
     const trip = await draftWithHotel(user);
-    await as(user).post(`/api/itineraries/${trip}/confirm`).expect(200);
+    await as(user)
+      .post(`/api/itineraries/${trip}/confirm`, await ctx.reviewed(user, trip))
+      .expect(200);
     await as(user).post(`/api/itineraries/${trip}/cancel`).expect(200);
     await as(agent)
       .delete(`/api/itineraries/${trip}`)

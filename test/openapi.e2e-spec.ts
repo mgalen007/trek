@@ -177,6 +177,7 @@ describe('OpenAPI docs (e2e)', () => {
         'itineraries_findAll',
         'itineraries_findEvents',
         'itineraries_findOne',
+        'itineraries_quote',
         'itineraries_remove',
         'itineraries_removeFlight',
         'itineraries_removeHotel',
