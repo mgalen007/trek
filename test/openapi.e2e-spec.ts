@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { ErrorCode } from '../common/http/api-error';
 import { createTestApp } from './utils';
 
@@ -20,7 +22,7 @@ type Operation = {
 };
 type OpenApiDoc = {
   openapi: string;
-  info: { title: string };
+  info: { title: string; version: string };
   paths: Record<string, Record<string, Operation>>;
   components: { schemas: Record<string, Schema> };
 };
@@ -68,6 +70,16 @@ describe('OpenAPI docs (e2e)', () => {
 
     expect(doc.openapi).toMatch(/^3\./);
     expect(doc.info.title).toBe('Trek API');
+    // The spec carries the release version from package.json.
+    expect(doc.info.version).toBe(
+      (
+        JSON.parse(
+          readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+        ) as {
+          version: string;
+        }
+      ).version,
+    );
   });
 
   it('gives every operation a unique id, a summary and a tag', () => {
