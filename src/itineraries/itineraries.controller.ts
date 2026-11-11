@@ -22,6 +22,8 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { AddHotelDto } from './dto/add-hotel.dto';
 import { AddFlightDto } from './dto/add-flight.dto';
+import { ConfirmItineraryDto } from './dto/confirm-itinerary.dto';
+import { ItineraryQuoteEntity } from './entities/itinerary-quote.entity';
 import {
   ItineraryEventQueryParams,
   ItineraryQueryParams,
@@ -270,26 +272,49 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
+  @Get(':id/quote')
+  @ApiOperation({
+    summary: 'Quote a draft before confirming',
+    description:
+      'Every item at current prices, the totals, the version, and any problem that would make confirm fail (bookable is false). Reserves nothing. Show this to the user, then send its version and totals to confirm.',
+  })
+  @ApiDataResponse(ItineraryQuoteEntity)
+  @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND])
+  async quote(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: ICurrentUser,
+  ) {
+    const quote = await this.itinerariesService.quote(id, currentUser);
+
+    return quote;
+  }
+
   @Post(':id/confirm')
   @Idempotent()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Confirm a draft, reserving everything',
     description:
-      'DRAFT -> PLANNED. Re-checks and reserves every room and seat at current prices, all or nothing. On BOOKING_CONFLICT a concurrent booking interfered: retry.',
+      'DRAFT -> PLANNED. Send the version and totals from GET /itineraries/:id/quote: the trip is booked only if it is still exactly that version at those prices (otherwise ITINERARY_CHANGED or PRICE_CHANGED: quote again and show the user). Reserves every room and seat, all or nothing. On BOOKING_CONFLICT a concurrent booking interfered: retry. Not available to agent tokens: the user confirms.',
   })
   @ApiDataResponse(ItineraryDetailEntity)
   @ApiErrorResponses(
     [HttpStatus.BAD_REQUEST, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT],
     {
-      [HttpStatus.CONFLICT]: `ROOMS_UNAVAILABLE, SEATS_UNAVAILABLE, BOOKING_CONFLICT (retry), or ${NOT_DRAFT}`,
+      [HttpStatus.CONFLICT]: `ITINERARY_CHANGED or PRICE_CHANGED (quote again), ROOMS_UNAVAILABLE, SEATS_UNAVAILABLE, BOOKING_CONFLICT (retry), or ${NOT_DRAFT}`,
     },
   )
   async confirm(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ConfirmItineraryDto,
     @CurrentUser() currentUser: ICurrentUser,
   ) {
-    const itinerary = await this.itinerariesService.confirm(id, currentUser);
+    const itinerary = await this.itinerariesService.confirm(
+      id,
+      currentUser,
+      dto,
+    );
 
     return itinerary;
   }

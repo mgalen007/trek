@@ -26,6 +26,8 @@ export class ItineraryEntity {
     enumName: 'ItineraryStatus',
   })
   status: ItineraryStatus;
+  /** Goes up with every change; confirm must name the version reviewed. */
+  version: number;
   createdAt: Date;
   updatedAt: Date;
 }
