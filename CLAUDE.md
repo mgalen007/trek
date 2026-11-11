@@ -24,6 +24,7 @@ bun run build
 bun run test                     # unit tests (*.spec.ts in src/ and common/)
 bun run test:e2e                 # e2e tests (test/*.e2e-spec.ts) against a real Postgres
 bun run openapi:export           # build, then write openapi.json (gitignored; needs JWT_SECRET, no DB)
+bun run seed:catalogue           # build, then add the sample catalogue to DATABASE_URL (idempotent)
 
 # Single test file / single test
 bun run test -- src/inventory/inventory.service.spec.ts
@@ -35,7 +36,9 @@ CI (`.github/workflows/ci.yml`) runs lint:check → typecheck → build → Open
 
 ### Docker
 
-`docker compose up --build` runs Postgres 17, Mailpit (catches every email; inbox at http://localhost:8025 — set `SMTP_URL` to send for real), a one-off `migrate` job (`prisma migrate deploy`, from the Dockerfile's `build` stage since the Prisma CLI is a dev dependency) and the API on `${API_PORT:-3000}`. Compose takes secrets (`JWT_SECRET`, `SEED_ADMIN_*`) from `.env` or the shell but always points the API at the `db` service; Postgres isn't published to the host. The Dockerfile's build stages are Node with bun copied in (the Nest and Prisma CLIs need `node` via their shebangs); the runtime image is `oven/bun:1.3-slim`, runs `bun dist/src/main.js` as the non-root `bun` user, and health-checks `/api/health`. `.env` is never copied into images (`.dockerignore`).
+**Sample data** (`src/scripts/sample-catalogue.ts` holds the data, `catalogue-seed.ts` the logic, `seed-catalogue.ts` the entry point): 17 destinations across Africa, the Middle East, Europe and the Americas, 3 hotels each, their airports and flights on 33 routes both ways for `SAMPLE_DATA_DAYS` (default 90). Hotel and airline names are invented; airport codes are real; times are UTC; prices vary deterministically by day. It only creates what's missing (destinations by name+country, airports by code, hotels by name per destination, flights by number+departure) and never updates or deletes, so it's safe to re-run. Refuses `NODE_ENV=production` unless `ALLOW_SAMPLE_DATA=true`. `seedCatalogue(db, { days })` is a plain function, used by `test/sample-data.e2e-spec.ts`.
+
+`docker compose up --build` runs Postgres 17, Mailpit (catches every email; inbox at http://localhost:8025 — set `SMTP_URL` to send for real), a one-off `migrate` job (`prisma migrate deploy`, from the Dockerfile's `build` stage since the Prisma CLI is a dev dependency), a one-off `seed` job (the sample catalogue, from the runtime image) and the API on `${API_PORT:-3000}`. Compose takes secrets (`JWT_SECRET`, `SEED_ADMIN_*`) from `.env` or the shell but always points the API at the `db` service; Postgres isn't published to the host. The Dockerfile's build stages are Node with bun copied in (the Nest and Prisma CLIs need `node` via their shebangs); the runtime image is `oven/bun:1.3-slim`, runs `bun dist/src/main.js` as the non-root `bun` user, and health-checks `/api/health`. `.env` is never copied into images (`.dockerignore`).
 
 ### Environment
 
@@ -118,6 +121,6 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
 - **Phase 2** — search and filtering. Done.
 - **Phase 3 — groundwork for the AI agent.** Done: response envelope + error codes, OpenAPI, user preferences + travelers, Idempotency-Key, refresh tokens, itinerary activity log.
 - **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting, Docker, scheduled jobs, transactional emails, password change/reset and email verification, README.
-- **Before the agent:** done: agent tokens (drafting only; the user confirms), safe confirm (quote, version and expected totals). Next, in order: sample catalogue seed data; request IDs.
+- **Before the agent:** done: agent tokens (drafting only; the user confirms), safe confirm (quote, version and expected totals), sample catalogue. Request IDs are deferred until the agent makes real calls.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
 - **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.
