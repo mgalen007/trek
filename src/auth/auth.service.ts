@@ -10,6 +10,10 @@ import {
 } from './refresh-tokens.service';
 import type { JwtPayload } from './types/jwt.types';
 import { AccountService } from './account.service';
+import type { JwtSignOptions } from '@nestjs/jwt';
+import { Role } from './types/auth.types';
+import type { ICurrentUser } from './types/user.types';
+import type { AgentTokenEntity } from './entities/agent-token.entity';
 import type { User } from '../../generated/prisma/client';
 import type { AuthTokensEntity } from './entities/auth-tokens.entity';
 
@@ -60,6 +64,30 @@ export class AuthService {
     );
     const refreshToken = await this.refreshTokens.startSession(user.id);
     return this.tokens(user, refreshToken);
+  }
+
+  /**
+   * A short-lived token for the user's AI agent: same user, but only routes
+   * marked @AgentAllowed() accept it, and it never carries admin rights.
+   * There's no refresh token; the web app asks for a new one when needed.
+   */
+  agentToken(user: ICurrentUser): AgentTokenEntity {
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: Role.USER,
+        kind: 'agent',
+      } satisfies JwtPayload,
+      {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+        expiresIn: (this.configService.get<string>('AGENT_TOKEN_EXPIRES_IN') ??
+          '15m') as JwtSignOptions['expiresIn'],
+      },
+    );
+    const { iat, exp } =
+      this.jwtService.decode<Required<JwtPayload>>(accessToken);
+    return { accessToken, tokenType: 'Bearer', expiresIn: exp - iat };
   }
 
   logout(token: string) {

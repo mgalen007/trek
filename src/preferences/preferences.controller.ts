@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Body,
   Controller,
@@ -26,6 +27,7 @@ import {
 export class PreferencesController {
   constructor(private preferencesService: PreferencesService) {}
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({
     summary: "Get the current user's travel preferences",

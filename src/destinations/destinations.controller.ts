@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Controller,
   Get,
@@ -44,6 +45,7 @@ export class DestinationsController {
     private airportsService: AirportsService,
   ) {}
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({
     summary: 'Search destinations',
@@ -57,6 +59,7 @@ export class DestinationsController {
     return destinations;
   }
 
+  @AgentAllowed()
   @Get(':id')
   @ApiOperation({ summary: 'Get a destination by id' })
   @ApiDataResponse(DestinationEntity)
@@ -67,6 +70,7 @@ export class DestinationsController {
     return destination;
   }
 
+  @AgentAllowed()
   @Get(':id/hotels')
   @ApiOperation({
     summary: "Search a destination's hotels",
@@ -88,6 +92,7 @@ export class DestinationsController {
     return hotels;
   }
 
+  @AgentAllowed()
   @Get(':id/airports')
   @ApiOperation({ summary: "List a destination's airports" })
   @ApiPageResponse(AirportEntity)

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -237,6 +238,14 @@ export class ItinerariesService {
       ItineraryStatus.DRAFT,
       ItineraryStatus.CANCELLED,
     );
+    // Cancelled trips are booking history; only the user may remove them.
+    if (currentUser.agent && itinerary.status !== ItineraryStatus.DRAFT)
+      throw new ForbiddenException(
+        apiError(
+          ErrorCode.AGENT_NOT_ALLOWED,
+          'The assistant can only delete draft itineraries',
+        ),
+      );
 
     return this.prisma.itinerary.delete({ where: { id } });
   }

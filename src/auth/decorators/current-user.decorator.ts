@@ -9,6 +9,7 @@ export const CurrentUser = createParamDecorator(
       id: req.user.id,
       email: req.user.email,
       role: req.user.role,
+      agent: req.user.agent,
     };
   },
 );

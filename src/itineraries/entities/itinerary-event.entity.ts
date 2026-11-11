@@ -26,6 +26,9 @@ export class ItineraryEventEntity {
   @ApiProperty({ enum: Role, enumName: 'Role', nullable: true })
   actorRole: Role | null;
 
+  /** True when the user's AI agent did it for them (with an agent token). */
+  viaAgent: boolean;
+
   /**
    * Facts copied at the time, so they stay readable after items or
    * catalogue records change. By type:

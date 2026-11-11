@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Controller,
   Get,
@@ -48,6 +49,7 @@ const NOT_DRAFT = 'Itinerary is not a DRAFT (INVALID_STATUS)';
 export class ItinerariesController {
   constructor(private itinerariesService: ItinerariesService) {}
 
+  @AgentAllowed()
   @Post()
   @Idempotent()
   @ApiOperation({
@@ -66,6 +68,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({ summary: "List the current user's itineraries" })
   @ApiPageResponse(ItinerarySummaryEntity)
@@ -82,6 +85,7 @@ export class ItinerariesController {
     return itineraries;
   }
 
+  @AgentAllowed()
   @Get(':id')
   @ApiOperation({
     summary: 'Get an itinerary with its hotel stays, flights and totals',
@@ -98,6 +102,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Get(':id/events')
   @ApiOperation({
     summary: "Get an itinerary's activity history",
@@ -120,6 +125,7 @@ export class ItinerariesController {
     return events;
   }
 
+  @AgentAllowed()
   @Put(':id')
   @ApiOperation({ summary: 'Rename or re-date a draft itinerary' })
   @ApiDataResponse(ItineraryDetailEntity)
@@ -141,6 +147,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Delete(':id')
   @ApiOperation({
     summary: 'Delete a draft or cancelled itinerary',
@@ -159,6 +166,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Post(':id/hotels')
   @Idempotent()
   @ApiOperation({
@@ -187,6 +195,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Delete(':id/hotels/:itemId')
   @ApiOperation({ summary: 'Remove a hotel stay from a draft' })
   @ApiDataResponse(ItineraryDetailEntity)
@@ -208,6 +217,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Post(':id/flights')
   @Idempotent()
   @ApiOperation({
@@ -238,6 +248,7 @@ export class ItinerariesController {
     return itinerary;
   }
 
+  @AgentAllowed()
   @Delete(':id/flights/:itemId')
   @ApiOperation({ summary: 'Remove a flight from a draft' })
   @ApiDataResponse(ItineraryDetailEntity)
