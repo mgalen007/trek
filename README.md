@@ -160,11 +160,15 @@ curl -X POST $API/itineraries -H "Authorization: Bearer $TOKEN" -H "Content-Type
 curl -X POST $API/itineraries/<tripId>/hotels -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"hotelId":"<id>","checkInDate":"2027-03-01","checkOutDate":"2027-03-04","rooms":1}'
 
-# 4. Confirm: reserves every room and seat at current prices, or nothing
-curl -X POST $API/itineraries/<tripId>/confirm -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: confirm-<tripId>-1"
+# 4. Quote: current prices, the total, the version, and anything that would block it
+curl $API/itineraries/<tripId>/quote -H "Authorization: Bearer $TOKEN"
+
+# 5. Confirm what the quote showed: reserves every room and seat, or nothing
+curl -X POST $API/itineraries/<tripId>/confirm -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: confirm-<tripId>-1" -d '{"expectedVersion":3,"expectedTotals":{"USD":"550.00"}}'
 ```
 
-Availability is checked when items are added, but only reserved when the trip is confirmed. A confirmed trip becomes `PLANNED`, can be cancelled to release everything, and becomes `COMPLETED` automatically after its last day.
+Confirm must repeat the `version` and `totals` from the quote. If the trip changed since (say, the assistant edited it), it answers `409 ITINERARY_CHANGED`; if prices changed, `409 PRICE_CHANGED` with the new totals. Quote again and show the user, so they always book exactly what they reviewed. Availability is checked when items are added, but only reserved when the trip is confirmed. A confirmed trip becomes `PLANNED`, can be cancelled to release everything, and becomes `COMPLETED` automatically after its last day.
 
 ### Retrying safely
 
@@ -236,7 +240,7 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 ## Roadmap
 
 - **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
-- **Next:** agent access tokens are done; then price and content checks on confirm, sample catalogue data, request IDs.
+- **Next:** agent access tokens and safe confirm are done; then sample catalogue data and request IDs.
 - **Then:** an AI agent built with PydanticAI that plans and books trips through this API; real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License
