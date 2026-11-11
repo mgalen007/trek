@@ -86,5 +86,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # The AI travel assistant (agent/). Its OpenRouter key and model come from
+  # agent/.env (copy agent/.env.example); without them it exits at startup,
+  # and the rest of the stack runs on.
+  agent:
+    build: ./agent
+    ports:
+      - '${AGENT_PORT:-8000}:8000'
+    env_file:
+      - path: ./agent/.env
+        required: false
+    environment:
+      # Overrides agent/.env, which points at a locally run API.
+      TREK_API_URL: http://api:3000/api
+    depends_on:
+      api:
+        condition: service_healthy
+    # Not unless-stopped: a missing key would make it restart forever.
+    restart: on-failure:3
+
 volumes:
   db-data:
