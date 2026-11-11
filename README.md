@@ -47,7 +47,7 @@ Requirements: Docker with Compose.
    docker compose up --build
    ```
 
-   Compose starts PostgreSQL, applies the database migrations, then starts the API. It also starts [Mailpit](https://mailpit.axllent.org/), which catches every email the API sends.
+   Compose starts PostgreSQL, applies the database migrations, adds the [sample catalogue](#sample-data), then starts the API. It also starts [Mailpit](https://mailpit.axllent.org/), which catches every email the API sends.
 
 3. Open:
 
@@ -60,6 +60,17 @@ Requirements: Docker with Compose.
    | Email inbox (Mailpit) | http://localhost:8025 |
 
 An admin account is created on first start from `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. Only admins can add destinations, hotels, airports and flights.
+
+### Sample data
+
+Compose fills the catalogue with sample data on every start; locally, run `bun run seed:catalogue`. It adds:
+
+- **17 destinations** across East and Southern Africa, the Middle East, Europe and the Americas, from Kigali and Nairobi to Paris, New York and Rio de Janeiro;
+- **3 hotels each**, at different prices and ratings, priced in local currencies (USD, EUR, GBP, RWF, KES…);
+- **their airports** (real codes: KGL, NBO, CDG, JFK…);
+- **flights on 33 routes**, both ways, for the next 90 days (`SAMPLE_DATA_DAYS`), with prices that vary by day.
+
+Hotel and airline names are invented, and flight times are in UTC. Running it again only adds what's missing (it never changes or deletes existing records) and tops the flight schedule up. It refuses to run with `NODE_ENV=production` unless `ALLOW_SAMPLE_DATA=true`.
 
 | Task | Command |
 |---|---|
@@ -92,6 +103,7 @@ Use Bun for everything in this repository, not npm.
 | `bun run test` | Unit tests |
 | `bun run test:e2e` | End-to-end tests against PostgreSQL |
 | `bun run openapi:export` | Write the OpenAPI spec to `openapi.json` |
+| `bun run seed:catalogue` | Add the [sample catalogue](#sample-data) to the database |
 | `bunx prisma migrate dev --name <name>` | Create a migration after changing `prisma/schema.prisma` |
 
 Without `SMTP_URL`, emails are written to the log instead of being sent.
@@ -120,6 +132,8 @@ Settings are read from environment variables, or from `.env` in development.
 | `AGENT_TOKEN_EXPIRES_IN` | | `15m` | Lifetime of tokens for the AI agent |
 | `APP_URL` | | | Frontend URL; verification and reset emails then contain links instead of bare codes |
 | `SCHEDULED_JOBS` | | | `off` disables the background jobs |
+| `SAMPLE_DATA_DAYS` | | `90` | Days of flights the sample data schedules |
+| `ALLOW_SAMPLE_DATA` | | | `true` lets sample data run with `NODE_ENV=production` |
 
 ## Using the API
 
@@ -240,7 +254,7 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 ## Roadmap
 
 - **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
-- **Next:** agent access tokens and safe confirm are done; then sample catalogue data and request IDs.
+- **Next:** agent access tokens, safe confirm and sample data are done; the agent itself is next.
 - **Then:** an AI agent built with PydanticAI that plans and books trips through this API; real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License
