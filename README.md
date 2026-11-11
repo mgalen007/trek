@@ -247,6 +247,7 @@ src/
 common/          shared HTTP envelope, errors, filters and helpers
 prisma/          schema and migrations
 test/            end-to-end tests
+agent/           the AI travel assistant (Python, PydanticAI): see agent/README.md
 ```
 
 Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](CLAUDE.md).
@@ -254,8 +255,8 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 ## Roadmap
 
 - **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
-- **Next:** agent access tokens, safe confirm and sample data are done; the agent itself is next.
-- **Then:** an AI agent built with PydanticAI that plans and books trips through this API; real flight and hotel suppliers (Amadeus or Duffel) and payments.
+- **The AI agent** ([agent/](agent/README.md)): a first version plans trips through this API (search, drafts, quotes; the user confirms). Next: streaming replies, shared conversation storage, a Docker image.
+- **Then:** real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License
 
