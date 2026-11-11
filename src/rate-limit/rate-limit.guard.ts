@@ -27,10 +27,12 @@ export class RateLimitGuard extends ThrottlerGuard {
     const header = req.headers.authorization;
     if (header?.startsWith('Bearer ')) {
       try {
-        const { sub } = await this.jwt.verifyAsync<JwtPayload>(
+        const { sub, kind } = await this.jwt.verifyAsync<JwtPayload>(
           header.slice('Bearer '.length),
         );
-        return `user:${sub}`;
+        // The agent has its own budget, so a busy agent can't lock the user
+        // out of their own account.
+        return kind === 'agent' ? `agent:${sub}` : `user:${sub}`;
       } catch {
         // Invalid or expired: rate limit by IP, auth will reject it anyway.
       }

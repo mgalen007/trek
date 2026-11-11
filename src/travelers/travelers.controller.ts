@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Body,
   Controller,
@@ -53,6 +54,7 @@ export class TravelersController {
     return traveler;
   }
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({ summary: "List the current user's travelers" })
   @ApiPageResponse(TravelerEntity)
@@ -66,6 +68,7 @@ export class TravelersController {
     return travelers;
   }
 
+  @AgentAllowed()
   @Get(':id')
   @ApiOperation({ summary: 'Get a traveler' })
   @ApiDataResponse(TravelerEntity)

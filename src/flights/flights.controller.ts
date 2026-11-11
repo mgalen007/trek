@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Controller,
   UseGuards,
@@ -48,6 +49,7 @@ export class FlightsController {
     return flight;
   }
 
+  @AgentAllowed()
   @Get(':id')
   @ApiOperation({
     summary: 'Get a flight by id',
@@ -61,6 +63,7 @@ export class FlightsController {
     return flight;
   }
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({
     summary: 'Search upcoming flights',

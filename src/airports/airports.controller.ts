@@ -1,3 +1,4 @@
+import { AgentAllowed } from '../auth/decorators/agent-allowed.decorator';
 import {
   Controller,
   Get,
@@ -47,6 +48,7 @@ export class AirportsController {
     return airport;
   }
 
+  @AgentAllowed()
   @Get(':id')
   @ApiOperation({ summary: 'Get an airport by id' })
   @ApiDataResponse(AirportEntity)
@@ -57,6 +59,7 @@ export class AirportsController {
     return airport;
   }
 
+  @AgentAllowed()
   @Get()
   @ApiOperation({ summary: 'List airports, optionally by destination or code' })
   @ApiPageResponse(AirportEntity)

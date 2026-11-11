@@ -117,6 +117,7 @@ Settings are read from environment variables, or from `.env` in development.
 | `CORS_ORIGINS` | | | Comma-separated browser origins; CORS is off when unset |
 | `SMTP_URL` | | | `smtp(s)://user:pass@host:port`; without it emails are only logged |
 | `MAIL_FROM` | | `Trek <no-reply@trek.local>` | Sender address |
+| `AGENT_TOKEN_EXPIRES_IN` | | `15m` | Lifetime of tokens for the AI agent |
 | `APP_URL` | | | Frontend URL; verification and reset emails then contain links instead of bare codes |
 | `SCHEDULED_JOBS` | | | `off` disables the background jobs |
 
@@ -168,6 +169,17 @@ Availability is checked when items are added, but only reserved when the trip is
 ### Retrying safely
 
 Send an `Idempotency-Key` header (for example a UUID) with POST requests. Repeating a request with the same key within 24 hours returns the original response, marked `Idempotent-Replayed: true`, instead of doing the work twice.
+
+### The AI agent
+
+The web app gets a token for the user's assistant from `POST /api/auth/agent-token`, using the user's own access token, and passes it to the agent service. The agent then acts as that user, with limits enforced by the API:
+
+- it can search the catalogue, read the user's profile, preferences, travelers and trips, and create, edit and delete **draft** trips;
+- it can't confirm or cancel trips, change the account, or use admin rights: those answer `403 AGENT_NOT_ALLOWED`. The user confirms with their own login;
+- its token expires after 15 minutes and has no refresh token: the web app requests a new one;
+- the trip history shows which changes the assistant made (`viaAgent`).
+
+The operations it may call are marked `x-agent-allowed: true` in the OpenAPI spec.
 
 ### Rate limits
 
@@ -224,7 +236,7 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 ## Roadmap
 
 - **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
-- **Next:** delegated access for the AI agent, with user approval for bookings; price quotes before confirming; sample catalogue data; request IDs.
+- **Next:** agent access tokens are done; then price and content checks on confirm, sample catalogue data, request IDs.
 - **Then:** an AI agent built with PydanticAI that plans and books trips through this API; real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License

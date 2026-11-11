@@ -312,6 +312,8 @@ model ItineraryEvent {
   // (scheduled jobs).
   actorId String?
   actorRole Role?
+  // Done by the user's AI agent (with an agent token) rather than by them.
+  viaAgent Boolean @default(false)
   details Json?
   createdAt DateTime @default(now())
 

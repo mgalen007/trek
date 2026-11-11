@@ -177,6 +177,7 @@ describe('ItinerariesService', () => {
           type: 'HOTEL_ADDED',
           actorId: 'alice',
           actorRole: 'USER',
+          viaAgent: false,
           details: {
             itemId: item.id,
             hotelId: 'hill-view',

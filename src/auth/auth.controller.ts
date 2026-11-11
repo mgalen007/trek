@@ -24,6 +24,8 @@ import {
   VerifyEmailDto,
 } from './dto/account.dto';
 import { AccountService } from './account.service';
+import { AgentTokenEntity } from './entities/agent-token.entity';
+import { AgentAllowed } from './decorators/agent-allowed.decorator';
 import { AuthService } from '../auth/auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -217,7 +219,28 @@ export class AuthController {
     return user;
   }
 
+  // Not @Idempotent: the idempotency store would keep the token it returns.
+  // Agent tokens can't call this (deny by default), so an agent can't extend
+  // its own access.
+  @Post('agent-token')
   @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Get a token for the user's AI agent",
+    description:
+      "Called by the web app with the user's own access token; the agent service then uses the returned token for its tool calls. It acts as this user but can only search, read and edit draft itineraries (operations marked x-agent-allowed); confirming, cancelling and account changes stay with the user. It never carries admin rights. Expires after AGENT_TOKEN_EXPIRES_IN (default 15 minutes); there's no refresh token, request a new one instead.",
+  })
+  @ApiDataResponse(AgentTokenEntity)
+  @ApiErrorResponses([HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN], {
+    [HttpStatus.FORBIDDEN]: 'Called with an agent token (AGENT_NOT_ALLOWED)',
+  })
+  agentToken(@CurrentUser() user: ICurrentUser) {
+    return this.authService.agentToken(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @AgentAllowed()
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get the current user's profile" })

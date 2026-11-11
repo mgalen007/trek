@@ -18,6 +18,7 @@ export const eventData = (
   type,
   actorId: actor?.id ?? null,
   actorRole: actor?.role ?? null,
+  viaAgent: actor?.agent ?? false,
   details,
 });
 

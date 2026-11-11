@@ -6,6 +6,7 @@ export interface IUser {
   email: string;
   firstName: string;
   lastName: string;
+  agent?: boolean;
 }
 
-export type ICurrentUser = Pick<IUser, 'id' | 'role' | 'email'>;
+export type ICurrentUser = Pick<IUser, 'id' | 'role' | 'email' | 'agent'>;
