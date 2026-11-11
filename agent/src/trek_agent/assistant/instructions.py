@@ -1,10 +1,3 @@
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-
-from .config import Settings
-from .tools import TOOLS, TrekDeps
-
 INSTRUCTIONS = """\
 You are Trek's travel assistant. You plan trips for the signed-in user by
 calling tools that act on their Trek account.
@@ -39,25 +32,3 @@ When a tool returns an error, read its code:
 
 Be concise and friendly. Use the user's currency where you can.
 """
-
-trek_agent = Agent(
-    deps_type=TrekDeps,
-    instructions=INSTRUCTIONS,
-    tools=TOOLS,
-)
-
-
-@trek_agent.instructions
-def todays_date(ctx: RunContext[TrekDeps]) -> str:
-    return f"Today is {ctx.deps.today.isoformat()} (UTC)."
-
-
-def build_model(settings: Settings) -> OpenAIChatModel:
-    """The chat model on OpenRouter, through its OpenAI-compatible API."""
-    return OpenAIChatModel(
-        settings.agent_model,
-        provider=OpenAIProvider(
-            base_url=settings.openrouter_base_url,
-            api_key=settings.openrouter_api_key.get_secret_value(),
-        ),
-    )

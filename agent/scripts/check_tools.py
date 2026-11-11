@@ -16,9 +16,8 @@ from typing import Any
 
 import httpx
 
-from trek_agent import tools
-from trek_agent.tools import TrekDeps
-from trek_agent.trek_client import TrekClient
+from trek_agent.assistant import TrekDeps, tools
+from trek_agent.clients.trek import TrekClient
 
 
 def show(name: str, result: dict[str, Any]) -> dict[str, Any]:

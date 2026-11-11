@@ -6,25 +6,12 @@ from uuid import uuid4
 
 import httpx
 
+from .errors import AgentTokenRejected, TrekApiError
+
 # Retries for network failures and 429s. POSTs keep the same Idempotency-Key
 # across retries, so a retried request never books or creates anything twice.
 MAX_ATTEMPTS = 3
 MAX_RETRY_WAIT_SECONDS = 10.0
-
-
-class TrekApiError(Exception):
-    """An error answer from the Trek API; `code` is its machine-readable code."""
-
-    def __init__(self, status: int, code: str, message: str, details: Any = None) -> None:
-        super().__init__(f"{status} {code}: {message}")
-        self.status = status
-        self.code = code
-        self.message = message
-        self.details = details
-
-
-class AgentTokenRejected(TrekApiError):
-    """The agent token is missing, expired or invalid: the web app must get a new one."""
 
 
 class TrekClient:

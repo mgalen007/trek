@@ -50,20 +50,46 @@ curl -s -X POST http://127.0.0.1:8000/chat -H "Authorization: Bearer $AGENT" \
 
 Send the `conversation_id` back with the next message to continue the conversation. Agent tokens last 15 minutes: when `/chat` answers 401, get a new one (the conversation is kept).
 
-| Status | Meaning |
-|---|---|
-| 401 | Missing, expired or invalid agent token |
-| 404 | Unknown conversation, or another user's |
-| 422 | Invalid message, or the assistant needed too many steps |
-| 502 | The Trek API answered with an unexpected error |
+Errors come back as `{"error": {"code", "message"}}`, the same shape as the Trek API's:
 
-## How it works
+| Status | `error.code` | Meaning |
+|---|---|---|
+| 401 | `MISSING_AGENT_TOKEN`, `INVALID_AGENT_TOKEN` | No agent token, or it's expired or invalid |
+| 404 | `CONVERSATION_NOT_FOUND` | Unknown conversation, or another user's |
+| 422 | `STEP_LIMIT_REACHED` | The assistant needed too many steps (invalid bodies are also 422, in FastAPI's format) |
+| 502 | `TREK_ERROR` | The Trek API answered with an unexpected error |
 
-- `tools.py`: one hand-written tool per Trek operation open to agents (`x-agent-allowed` in Trek's OpenAPI spec). Each returns a compact summary. API errors reach the model as `{"error": {"code", ...}}`, so it can react, for example offering another hotel when one is full.
-- `agent.py`: the instructions (plan with the user's preferences, never invent results, quote before stating a price, never book) and the OpenRouter model.
-- `trek_client.py`: sends the agent token, retries network failures and `429`s (honouring `Retry-After`), and gives each POST an `Idempotency-Key`, so retries never create anything twice.
-- `conversations.py`: chat history, in memory, per user.
-- One chat message may use at most 30 model calls (`USAGE_LIMITS` in `app.py`), so a confused model can't loop, or spend, forever.
+## How it's organised
+
+Layers call downwards only: **routers → services → repositories, clients and the assistant**. `core/` is shared by all of them and has no web-framework code.
+
+```
+src/trek_agent/
+  app.py              composition: builds the app, includes routers, registers error handlers
+  main.py             ASGI entry point
+  api/                HTTP layer only (the only FastAPI code, with app.py)
+    routers/          chat.py, health.py: request → service call → response
+    schemas/          request and response models
+    dependencies.py   agent token from the header, Trek client and services per request
+    error_handlers.py domain errors → {"error": {"code", "message"}}
+  services/
+    chat_service.py   the chat flow: who is asking → which conversation → run the assistant → save
+  repositories/
+    conversations.py  ConversationRepository (interface) + the in-memory version
+  clients/trek/       the Trek API: token, retries, 429s, Idempotency-Key; TrekApiError
+  assistant/          the PydanticAI agent
+    agent.py          the agent, its tools, today's date, usage limits
+    instructions.py   what the model is told
+    model.py          the OpenRouter model
+    deps.py           what every tool receives
+    tools/            catalogue.py, trips.py, profile.py, plus presenters.py (what the model sees)
+  core/               config.py, errors.py (domain errors), resources.py (shared HTTP client, model, repository)
+```
+
+- **Adding an endpoint:** a router in `api/routers/` that calls a service. Business rules go in the service, which raises domain errors from `core/errors.py`; never build error responses in routers.
+- **Adding a tool:** a function in the right `assistant/tools/` module, decorated with `@reports_errors`, returning a presenter's output, and listed in `TOOLS`. Its docstring is what the model reads. Only add tools for Trek operations open to agents (`x-agent-allowed`).
+- **Durable conversations:** implement `ConversationRepository` (e.g. with Redis) and create it in `core/resources.py`; nothing else changes.
+- Tool errors reach the model as `{"error": {"code", ...}}`, so it can react, for example offering another hotel when one is full. One chat message may use at most 30 model calls (`USAGE_LIMITS` in `assistant/agent.py`).
 
 ## Development
 

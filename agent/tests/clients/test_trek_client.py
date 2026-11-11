@@ -1,10 +1,10 @@
 import httpx
 import pytest
 
-from trek_agent import trek_client
-from trek_agent.trek_client import AgentTokenRejected, TrekApiError, TrekClient
+from trek_agent.clients.trek import AgentTokenRejected, TrekApiError, TrekClient
+from trek_agent.clients.trek import client as trek_client
 
-from .conftest import TOKEN, TREK_URL, FakeTrek, error, ok
+from ..fakes import TOKEN, TREK_URL, FakeTrek, error, ok
 
 pytestmark = pytest.mark.anyio
 
