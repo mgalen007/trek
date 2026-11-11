@@ -112,3 +112,20 @@ jobs:
 
       - if: always()
         run: docker compose down --volumes
+
+  agent:
+    name: Agent (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      # Tests use a scripted model and a fake Trek API: no key or network.
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
