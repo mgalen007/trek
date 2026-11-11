@@ -38,7 +38,7 @@ The first release: a travel booking and itinerary-planning API, and an AI assist
 - Health checks (`/api/health`, `/api/health/ready`), security headers, optional CORS.
 - Scheduled jobs: clean-up of expired keys, tokens and codes; completing past trips.
 - Transactional emails (welcome, booking confirmed, cancelled and completed, password and email changes) through an outbox with retries; SMTP or log-only.
-- Docker image and a Compose stack (PostgreSQL, Mailpit, migrations, sample data, API).
+- Docker images and a Compose stack (PostgreSQL, Mailpit, migrations, sample data, API, and the assistant).
 - A sample catalogue: 17 destinations across Africa, the Middle East, Europe and the Americas, with hotels, airports and 90 days of flights.
 
 ### Agent (`agent/`)
@@ -47,6 +47,7 @@ The first release: a travel booking and itinerary-planning API, and an AI assist
 - 14 tools covering search, drafts and quotes. It plans with the user's preferences, quotes before stating prices, and leaves confirming to the user.
 - Uses only the user's agent token, so the API's rules hold whatever the model does. API errors reach the model with their code, so it can recover.
 - Conversations per user; a cap on model calls per message.
+- Runs in Docker Compose next to the API (port 8000), reading its OpenRouter key and model from `agent/.env`.
 
 ### Known limitations
 
@@ -57,6 +58,6 @@ The first release: a travel booking and itinerary-planning API, and an AI assist
 - **Email verification isn't required** for booking.
 - **No currency conversion:** prices stay in each supplier's currency, and sorting compares raw amounts.
 - **Trips cover a single destination;** flights are direct only (connections are planned leg by leg).
-- **The assistant doesn't stream its replies** and has no Docker image yet.
+- **The assistant doesn't stream its replies.**
 
 [0.1.0]: https://github.com/mgalen007/trek/releases/tag/v0.1.0
