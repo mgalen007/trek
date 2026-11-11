@@ -8,6 +8,7 @@ type Schema = Record<string, unknown> & {
 };
 type Operation = {
   operationId: string;
+  'x-agent-allowed'?: boolean;
   summary?: string;
   tags?: string[];
   security?: unknown[];
@@ -109,6 +110,8 @@ describe('OpenAPI docs (e2e)', () => {
       if (PUBLIC_OPERATIONS.includes(o.operationId)) continue;
       // Its body holds passwords, which the idempotency store would hash.
       if (o.operationId === 'auth_changePassword') continue;
+      // Its response is a token, which the idempotency store would keep.
+      if (o.operationId === 'auth_agentToken') continue;
       const header = o.parameters?.find(
         (p) => p.in === 'header' && p.name === 'Idempotency-Key',
       );
@@ -144,6 +147,44 @@ describe('OpenAPI docs (e2e)', () => {
     );
     expect(doc.components.schemas.ErrorCode.enum).toEqual(
       Object.values(ErrorCode),
+    );
+  });
+
+  // The agent's tools are generated from these, so the list is pinned:
+  // opening a route to the agent must be a deliberate change here.
+  it('marks exactly the agent-callable operations', () => {
+    const agentOps = operations
+      .filter((o) => o['x-agent-allowed'])
+      .map((o) => o.operationId)
+      .sort();
+
+    expect(agentOps).toEqual(
+      [
+        'airports_findAll',
+        'airports_findOneById',
+        'auth_getProfile',
+        'destinations_findAirports',
+        'destinations_findAll',
+        'destinations_findHotels',
+        'destinations_findOneById',
+        'flights_findAll',
+        'flights_findOneById',
+        'hotels_findAll',
+        'hotels_findOneById',
+        'itineraries_addFlight',
+        'itineraries_addHotel',
+        'itineraries_create',
+        'itineraries_findAll',
+        'itineraries_findEvents',
+        'itineraries_findOne',
+        'itineraries_remove',
+        'itineraries_removeFlight',
+        'itineraries_removeHotel',
+        'itineraries_update',
+        'preferences_get',
+        'travelers_findAll',
+        'travelers_findOne',
+      ].sort(),
     );
   });
 
