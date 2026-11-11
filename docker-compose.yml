@@ -42,6 +42,22 @@ services:
       db:
         condition: service_healthy
 
+  # Adds the sample catalogue: 17 destinations with hotels and airports, and
+  # flights for the next SAMPLE_DATA_DAYS days. Only adds what's missing, so
+  # it runs on every start and tops the flight schedule up.
+  seed:
+    build: .
+    command: ['bun', 'dist/src/scripts/seed-catalogue.js']
+    environment:
+      DATABASE_URL: *database-url
+      ALLOW_SAMPLE_DATA: 'true'
+      SAMPLE_DATA_DAYS: ${SAMPLE_DATA_DAYS:-90}
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     build: .
     ports:
@@ -64,7 +80,7 @@ services:
       SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
       MAIL_FROM: ${MAIL_FROM:-Trek <no-reply@trek.local>}
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
