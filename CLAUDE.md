@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Trek is a travel booking and itinerary-planning REST API: NestJS 11, Prisma 7 (`prisma-client` generator + `@prisma/adapter-pg`) on PostgreSQL. Users browse destinations, hotels, airports and flights, build a draft itinerary, and confirm it to reserve every room and seat at once.
 
-The API is being shaped to be driven by an **AI agent built with PydanticAI** (a separate Python service, not in this repo yet). Design decisions favour what an agent needs: a predictable response shape, machine-readable error codes, a complete OpenAPI spec with stable operation ids, and retry-safe mutations.
+The API is being shaped to be driven by an **AI agent built with PydanticAI** (a separate Python service in `agent/`, see [Agent](#agent-agent)). Design decisions favour what an agent needs: a predictable response shape, machine-readable error codes, a complete OpenAPI spec with stable operation ids, and retry-safe mutations.
 
 ## Tooling
 
-Use **bun / bunx** for everything — never npm, npx or node directly.
+Use **bun / bunx** for everything on the API side — never npm, npx or node directly. The Python agent in `agent/` uses **uv**.
 
 ```bash
 bun install
@@ -111,6 +111,18 @@ Stripe-style `Idempotency-Key` header on authenticated POST routes marked `@Idem
 - Prettier: single quotes, trailing commas.
 - Comments explain *why*, briefly; match the existing density.
 
+## Agent (`agent/`)
+
+Python 3.13, **uv**, PydanticAI 2, FastAPI. A model on **OpenRouter** through PydanticAI's OpenAI-compatible `OpenAIChatModel` + `OpenAIProvider(base_url=...)`; `AGENT_MODEL` picks it. Commands, run from `agent/`: `uv sync`, `uv run trek-agent` (serves `POST /chat` on :8000), `uv run pytest`, `uv run ruff check .`, `uv run ruff format .`. CI's `agent` job runs lint, format check and tests.
+
+**Layers** (in `src/trek_agent/`, calling downwards only): `api/` (routers, schemas, `dependencies.py`, `error_handlers.py` — the only FastAPI code besides the composition root `app.py`) → `services/` (business flow, raises domain errors from `core/errors.py`) → `repositories/` (storage behind interfaces), `clients/trek/` (HTTP to Trek) and `assistant/` (the PydanticAI agent). `core/` holds config, domain errors and the shared resources (`resources.py`), with no web-framework code. Routers stay thin and never build error responses; every error leaves as `{"error": {"code", "message"}}`, Trek's shape. `agent/README.md` has the full map and "how to add an endpoint / a tool".
+
+- **Auth:** `POST /chat` takes the user's **agent token** as its bearer token (the web app gets it from `POST /api/auth/agent-token`); `ChatService` passes it to every Trek call and never sees the user's own token, so the API's agent rules (drafting only) hold whatever the model does. It checks the token with `/auth/me` before paying for any model call; conversations belong to that user (another user's id is `CONVERSATION_NOT_FOUND`, 404) and live in `InMemoryConversationRepository` — swap in another `ConversationRepository` in `core/resources.py` for durability.
+- **Tools** (`assistant/tools/`: `catalogue.py`, `trips.py`, `profile.py`): hand-written, one per Trek operation open to agents, wrapped in `@reports_errors`, returning `presenters.py` views (keep them compact: the model reads them every turn). Docstrings are the tool descriptions. Trek errors return to the model as `{"error": {"code", ...}}`; `AgentTokenRejected` aborts the run so `/chat` answers 401. **When a Trek route gains `@AgentAllowed()` or changes its response shape, update the tool** — `uv run python scripts/check_tools.py <agent token>` runs every tool against a real Trek (no LLM).
+- **Client** (`clients/trek/`): unwraps `{ data }`, raises `TrekApiError(code)`, retries network errors and 429s (`Retry-After`), and sends an `Idempotency-Key` on POSTs that's kept across retries.
+- **Instructions** (`assistant/instructions.py`): plan with the user's preferences, never invent results or ids, quote before stating a total, never book (the user confirms in the app), how to react to each error code. Today's date is added per run (`assistant/agent.py`, which also holds `USAGE_LIMITS`).
+- **Tests** mirror the layers (`tests/api`, `services`, `repositories`, `clients`, `assistant`) and use `tests/fakes.py`: a scripted `FunctionModel` (`ScriptedModel`) and a fake Trek API (`FakeTrek`, an httpx `MockTransport`) — no network, no key. Test business flow at the service level; keep `tests/api` to HTTP concerns.
+
 ## Git workflow
 
 Branch off an up-to-date `main` (verify against GitHub — `git fetch https://github.com/mgalen007/trek.git main`, since SSH may be unavailable), make small Conventional Commits (`feat:`, `fix:`, `test:`, `ci:`, `refactor:`, `style:`, `docs:`; `feat!:` for breaking changes), and stop. The maintainer pushes, opens the PR, reviews and merges. One branch/PR per roadmap item. Schema changes usually land as their own commit (`feat: schema for …`) before the feature commit.
@@ -123,4 +135,4 @@ Branch off an up-to-date `main` (verify against GitHub — `git fetch https://gi
 - **Phase 4 — production hardening.** Done: health checks, helmet, CORS, rate limiting, Docker, scheduled jobs, transactional emails, password change/reset and email verification, README.
 - **Before the agent:** done: agent tokens (drafting only; the user confirms), safe confirm (quote, version and expected totals), sample catalogue. Request IDs are deferred until the agent makes real calls.
 - **Phase 5 — real providers and payments:** external inventory (Amadeus/Duffel) behind `InventoryService`, payments.
-- **The PydanticAI agent:** a Python agent that plans and books trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.
+- **The PydanticAI agent** (`agent/`, first version done: tools, chat endpoint, tests). Next: streaming replies, shared conversation storage, a Docker image, request IDs on the API. It plans trips by calling this API as tools (operation ids → tool names, `error.code` for recovery, `Idempotency-Key` for safe retries, user preferences and travelers as planning context). Keep it in mind when designing endpoints: every operation should be self-describing in OpenAPI and safe for an automated client to retry.
