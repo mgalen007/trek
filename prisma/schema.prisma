@@ -287,6 +287,10 @@ model Itinerary {
   startDate DateTime
   endDate DateTime
   status ItineraryStatus @default(DRAFT)
+  // Goes up with every change to the trip or its items. Confirm must name the
+  // version the user reviewed, so nobody (e.g. the agent) can change the trip
+  // between review and booking.
+  version Int @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
