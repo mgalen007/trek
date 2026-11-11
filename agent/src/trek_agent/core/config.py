@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,16 @@ class Settings(BaseSettings):
 
     # Conversations are kept in memory for this long after their last message.
     conversation_ttl_minutes: int = 120
+
+    # Fail at startup, not on the first chat, when these are set but empty
+    # (easy to get from an unfilled .env or a compose variable).
+    @field_validator("openrouter_api_key", "agent_model")
+    @classmethod
+    def not_blank[T: (str, SecretStr)](cls, value: T) -> T:
+        raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+        if not raw.strip():
+            raise ValueError("must not be empty (set it in agent/.env)")
+        return value
 
 
 @lru_cache

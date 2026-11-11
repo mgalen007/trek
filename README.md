@@ -58,6 +58,7 @@ Requirements: Docker with Compose.
    | OpenAPI spec (JSON) | http://localhost:3000/api/docs-json |
    | Health | http://localhost:3000/api/health/ready |
    | Email inbox (Mailpit) | http://localhost:8025 |
+   | AI travel assistant | http://localhost:8000 (needs `agent/.env`: see [agent/README.md](agent/README.md)) |
 
 An admin account is created on first start from `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`. Only admins can add destinations, hotels, airports and flights.
 
@@ -255,7 +256,7 @@ Contributor notes (architecture, conventions, git workflow) are in [CLAUDE.md](C
 ## Roadmap
 
 - **Done:** itineraries and bookings, search, the agent groundwork (response envelope, error codes, OpenAPI, preferences and travelers, idempotency, refresh tokens, activity log), production hardening (health checks, security headers, rate limiting, Docker, scheduled jobs, emails, account security).
-- **The AI agent** ([agent/](agent/README.md)): a first version plans trips through this API (search, drafts, quotes; the user confirms). Next: streaming replies, shared conversation storage, a Docker image.
+- **The AI agent** ([agent/](agent/README.md)): a first version plans trips through this API (search, drafts, quotes; the user confirms). It runs in Docker Compose with the rest of the stack. Next: streaming replies, shared conversation storage.
 - **Then:** real flight and hotel suppliers (Amadeus or Duffel) and payments.
 
 ## License

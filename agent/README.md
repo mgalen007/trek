@@ -32,6 +32,10 @@ uv run trek-agent         # serves on http://127.0.0.1:8000
 | `CONVERSATION_TTL_MINUTES` | | `120` | How long an idle conversation is kept |
 | `AGENT_HOST`, `AGENT_PORT` | | `127.0.0.1`, `8000` | Where the service listens |
 
+### With Docker
+
+The project's `docker compose up --build` (from the repository root) runs the agent alongside the API, on http://localhost:8000 (`AGENT_PORT` to change it). It reads `OPENROUTER_API_KEY` and `AGENT_MODEL` from `agent/.env`, and reaches the API over the internal network, whatever `TREK_API_URL` says there. Without a key or model, the agent exits at startup with a clear error, and the rest of the stack runs on. To build the image alone: `docker build -t trek-agent agent`.
+
 ## Talking to it
 
 Until there's a web app, get an agent token by hand and call `/chat`:
@@ -104,4 +108,3 @@ uv run python scripts/check_tools.py <agent token>   # every tool against a real
 
 - **Streaming replies:** `/chat` answers once the reply is complete.
 - **Shared conversation storage:** history lives in this process, so it's lost on restart and not shared between instances.
-- **A Docker image** for this service.
