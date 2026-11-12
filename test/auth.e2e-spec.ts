@@ -123,9 +123,15 @@ describe('Auth sessions (e2e)', () => {
   });
 
   it('validates the refresh body', async () => {
+    // No token at all (no body, no cookie) is an auth failure, not bad input.
     await api()
       .post('/api/auth/refresh')
       .send({})
+      .expect(401)
+      .expect(hasCode('INVALID_REFRESH_TOKEN'));
+    await api()
+      .post('/api/auth/refresh')
+      .send({ refreshToken: 'x'.repeat(256) })
       .expect(400)
       .expect(hasCode('VALIDATION_FAILED'));
   });

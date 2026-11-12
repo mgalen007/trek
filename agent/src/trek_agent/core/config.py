@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     # Conversations are kept in memory for this long after their last message.
     conversation_ttl_minutes: int = 120
 
+    # Browser origins allowed to call the agent, comma-separated (e.g. the
+    # web app's http://localhost:5173). CORS is off when empty.
+    cors_origins: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     # Fail at startup, not on the first chat, when these are set but empty
     # (easy to get from an unfilled .env or a compose variable).
     @field_validator("openrouter_api_key", "agent_model")

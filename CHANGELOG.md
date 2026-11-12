@@ -4,6 +4,22 @@ All notable changes to Trek are recorded here. The format follows [Keep a Change
 
 One version covers the whole repository: the API and the agent in `agent/` are released together.
 
+## [Unreleased]
+
+Getting the backend ready for a web app.
+
+### API
+
+- The refresh token is also set as an httpOnly, `SameSite=Lax` cookie (`trek_refresh`, scoped to `/api/auth`) on login, refresh and change-password, so browsers never have to store it where JavaScript can read it. `/auth/refresh` and `/auth/logout` use the cookie when the body has no token; logout, logout-all and a rejected refresh clear it. The token stays in the response body, so other clients are unaffected.
+- CORS allows credentials for the origins in `CORS_ORIGINS`.
+- New settings: `REFRESH_COOKIE_SECURE`, `REFRESH_COOKIE_SAMESITE`.
+- `/auth/refresh` with no token at all now answers `401 INVALID_REFRESH_TOKEN` (it was `400 VALIDATION_FAILED`, since the token was required in the body).
+
+### Agent
+
+- CORS for browser origins in `CORS_ORIGINS`, so the web app can call `/chat`.
+- The interactive docs (`/docs`) now send the agent token (an **Authorize** button), and show how to start and continue a conversation.
+
 ## [0.1.0] - 2026-11-11
 
 The first release: a travel booking and itinerary-planning API, and an AI assistant that plans trips through it. Ready for development and demos, not yet for production (see [Known limitations](#known-limitations)).

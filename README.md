@@ -127,7 +127,9 @@ Settings are read from environment variables, or from `.env` in development.
 | `RATE_LIMIT_PER_MINUTE` | | `120` | Requests per minute per user (per IP when anonymous) |
 | `AUTH_RATE_LIMIT_PER_MINUTE` | | `10` | Stricter limit on login, registration, password and verification routes |
 | `TRUST_PROXY` | | | Set behind a load balancer (e.g. `1`) so rate limits see real client IPs |
-| `CORS_ORIGINS` | | | Comma-separated browser origins; CORS is off when unset |
+| `CORS_ORIGINS` | | | Comma-separated browser origins (e.g. the web app's); they may send credentials. CORS is off when unset |
+| `REFRESH_COOKIE_SECURE` | | `true` when `NODE_ENV=production` | Mark the refresh cookie HTTPS-only (Compose sets `false`: it runs on plain HTTP) |
+| `REFRESH_COOKIE_SAMESITE` | | `lax` | `lax` or `strict` |
 | `SMTP_URL` | | | `smtp(s)://user:pass@host:port`; without it emails are only logged |
 | `MAIL_FROM` | | `Trek <no-reply@trek.local>` | Sender address |
 | `AGENT_TOKEN_EXPIRES_IN` | | `15m` | Lifetime of tokens for the AI agent |
@@ -157,6 +159,8 @@ Errors always look like this. Branch on `error.code`, never on the message:
 ### Signing in
 
 `POST /api/auth/login` returns a short-lived `accessToken`, sent as `Authorization: Bearer <token>`, and a `refreshToken`. Exchange the refresh token at `POST /api/auth/refresh` before the access token expires. Each refresh returns a new refresh token, and the old one stops working. Reusing a spent refresh token signs out that session everywhere.
+
+**In a browser,** don't store the refresh token yourself. Login, refresh and change-password also set it as the `trek_refresh` cookie, which is httpOnly (JavaScript can't read it, so an XSS bug can't steal it). Call `/api/auth/refresh` and `/api/auth/logout` with an empty body and `credentials: 'include'`, and the cookie is used, renewed, or cleared. Keep the access token in memory. The cookie is `SameSite=Lax`, so the web app must be on the same site as the API (e.g. `app.example.com` and `api.example.com`, or `localhost` in development), and its origin must be in `CORS_ORIGINS`.
 
 ### Booking a trip
 

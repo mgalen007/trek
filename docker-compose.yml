@@ -76,6 +76,10 @@ services:
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-10}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # This stack is plain HTTP: an HTTPS-only cookie would be dropped by
+      # some browsers. Set true behind HTTPS.
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+      REFRESH_COOKIE_SAMESITE: ${REFRESH_COOKIE_SAMESITE:-lax}
       TRUST_PROXY: ${TRUST_PROXY:-}
       SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
       MAIL_FROM: ${MAIL_FROM:-Trek <no-reply@trek.local>}

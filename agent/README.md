@@ -30,6 +30,7 @@ uv run trek-agent         # serves on http://127.0.0.1:8000
 | `TREK_API_URL` | | `http://localhost:3000/api` | The Trek API, with its `/api` prefix |
 | `OPENROUTER_BASE_URL` | | `https://openrouter.ai/api/v1` | Any OpenAI-compatible endpoint works |
 | `CONVERSATION_TTL_MINUTES` | | `120` | How long an idle conversation is kept |
+| `CORS_ORIGINS` | | | Browser origins allowed to call the agent, comma-separated (e.g. `http://localhost:5173`); CORS is off when unset |
 | `AGENT_HOST`, `AGENT_PORT` | | `127.0.0.1`, `8000` | Where the service listens |
 
 ### With Docker

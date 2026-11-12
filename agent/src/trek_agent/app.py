@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic_ai.models import Model
 
 from .api import api_router
@@ -19,14 +20,24 @@ def create_app(
     trek_transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastAPI:
     """`model` and `trek_transport` replace OpenRouter and the Trek API, for tests."""
+    config = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        async with open_resources(settings or get_settings(), model, trek_transport) as resources:
+        async with open_resources(config, model, trek_transport) as resources:
             app.state.resources = resources
             yield
 
     app = FastAPI(title="Trek agent", lifespan=lifespan)
+    if config.cors_origin_list:
+        # The agent token travels in the Authorization header, not a cookie,
+        # so no credentials mode is needed.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=config.cors_origin_list,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
     register_error_handlers(app)
     app.include_router(api_router)
     return app

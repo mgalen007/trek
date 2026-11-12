@@ -9,6 +9,7 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RefreshTokensService } from './refresh-tokens.service';
 import { AccountService } from './account.service';
+import { RefreshCookieService } from './refresh-cookie.service';
 
 @Module({
   imports: [
@@ -29,7 +30,13 @@ import { AccountService } from './account.service';
     PassportModule,
     UsersModule,
   ],
-  providers: [AuthService, AccountService, RefreshTokensService, JwtStrategy],
+  providers: [
+    AuthService,
+    AccountService,
+    RefreshTokensService,
+    RefreshCookieService,
+    JwtStrategy,
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {}
