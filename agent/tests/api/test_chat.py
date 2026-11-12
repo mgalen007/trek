@@ -34,10 +34,37 @@ def test_replies_and_returns_a_conversation_id(settings: Settings, trek: FakeTre
 
 def test_requires_an_agent_token(settings: Settings, trek: FakeTrek) -> None:
     with client_for(settings, trek, ScriptedModel([])) as client:
-        res = client.post("/chat", json={"message": "hi"})
+        missing = client.post("/chat", json={"message": "hi"})
+        not_bearer = client.post(
+            "/chat", headers={"Authorization": f"Basic {TOKEN}"}, json={"message": "hi"}
+        )
 
-    assert res.status_code == 401
-    assert res.json()["error"]["code"] == "MISSING_AGENT_TOKEN"
+    for res in (missing, not_bearer):
+        assert res.status_code == 401
+        assert res.json()["error"]["code"] == "MISSING_AGENT_TOKEN"
+
+
+def test_passes_the_agent_token_to_trek(settings: Settings, trek: FakeTrek) -> None:
+    with client_for(settings, trek, ScriptedModel(["Hi"])) as client:
+        client.post("/chat", headers=AUTH, json={"message": "hi"})
+
+    [me_call] = trek.calls("GET", "/auth/me")
+    assert me_call.headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+def test_docs_declare_the_agent_token_as_a_bearer_scheme(settings: Settings) -> None:
+    # A plain `Authorization` header parameter is ignored by Swagger UI and
+    # other OpenAPI tools, so the token must be a security scheme.
+    spec = create_app(settings).openapi()
+    chat = spec["paths"]["/chat"]["post"]
+
+    assert spec["components"]["securitySchemes"]["AgentToken"] == {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The user's agent token, from Trek's `POST /api/auth/agent-token`.",
+    }
+    assert chat["security"] == [{"AgentToken": []}]
+    assert not [p for p in chat.get("parameters", []) if p["name"].lower() == "authorization"]
 
 
 def test_rejected_tokens_get_401_so_the_web_app_fetches_a_new_one(
