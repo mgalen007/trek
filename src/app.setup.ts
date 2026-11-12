@@ -59,6 +59,9 @@ export function configureApp(app: INestApplication) {
   if (corsOrigins)
     app.enableCors({
       origin: corsOrigins.split(',').map((origin) => origin.trim()),
+      // Lets the browser send and receive the trek_refresh cookie
+      // (fetch(..., { credentials: 'include' })).
+      credentials: true,
       exposedHeaders: [
         'Idempotent-Replayed',
         'Retry-After',

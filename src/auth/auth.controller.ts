@@ -7,7 +7,11 @@ import {
   Body,
   UseGuards,
   Request,
+  Req,
+  Res,
+  UnauthorizedException,
 } from '@nestjs/common';
+import type { Request as ExpressRequest, Response } from 'express';
 import {
   ApiBearerAuth,
   ApiNoContentResponse,
@@ -40,6 +44,8 @@ import { Idempotent } from '../idempotency/idempotent.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { ICurrentUser } from './types/user.types';
 import { StrictRateLimit } from '../rate-limit/strict-rate-limit.decorator';
+import { RefreshCookieService } from './refresh-cookie.service';
+import { apiError, ErrorCode } from 'common/http/api-error';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -48,6 +54,7 @@ export class AuthController {
     private authService: AuthService,
     private usersService: UsersService,
     private account: AccountService,
+    private refreshCookie: RefreshCookieService,
   ) {}
 
   @Post('login')
@@ -56,14 +63,23 @@ export class AuthController {
   @ApiOperation({
     summary: 'Log in',
     description:
-      'Exchanges email and password for a short-lived access token and a refresh token. Each login starts a separate session.',
+      'Exchanges email and password for a short-lived access token and a refresh token. Each login starts a separate session. The refresh token is also set as the httpOnly `trek_refresh` cookie, for browsers.',
   })
   @ApiDataResponse(AuthTokensEntity)
   @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED], {
     [HttpStatus.UNAUTHORIZED]: 'Wrong email or password (INVALID_CREDENTIALS)',
   })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.login(dto.email, dto.password);
+    this.refreshCookie.set(
+      res,
+      tokens.refreshToken,
+      tokens.refreshTokenExpiresAt,
+    );
+    return tokens;
   }
 
   @Post('refresh')
@@ -71,15 +87,39 @@ export class AuthController {
   @ApiOperation({
     summary: 'Refresh the access token',
     description:
-      'Exchanges a refresh token for a new access token and a new refresh token; store the new refresh token, the old one is spent. Retrying with the same token within 30 seconds (e.g. after a lost response) is safe. Presenting a spent token later is treated as theft and revokes the whole session (REFRESH_TOKEN_REUSED).',
+      'Exchanges a refresh token for a new access token and a new refresh token; store the new refresh token, the old one is spent. Send it in the body, or (browsers) leave the body empty to use the `trek_refresh` cookie, which is renewed too. Retrying with the same token within 30 seconds (e.g. after a lost response) is safe. Presenting a spent token later is treated as theft and revokes the whole session (REFRESH_TOKEN_REUSED).',
   })
   @ApiDataResponse(AuthTokensEntity)
   @ApiErrorResponses([HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED], {
     [HttpStatus.UNAUTHORIZED]:
-      'Unknown, expired or revoked token (INVALID_REFRESH_TOKEN), or a spent token replayed, which revokes the session (REFRESH_TOKEN_REUSED); log in again',
+      'No token, or an unknown, expired or revoked one (INVALID_REFRESH_TOKEN), or a spent token replayed, which revokes the session (REFRESH_TOKEN_REUSED); log in again',
   })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto.refreshToken);
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = dto?.refreshToken ?? this.refreshCookie.read(req);
+    try {
+      if (!token)
+        throw new UnauthorizedException(
+          apiError(
+            ErrorCode.INVALID_REFRESH_TOKEN,
+            'No refresh token in the body or the trek_refresh cookie; log in again',
+          ),
+        );
+      const tokens = await this.authService.refresh(token);
+      this.refreshCookie.set(
+        res,
+        tokens.refreshToken,
+        tokens.refreshTokenExpiresAt,
+      );
+      return tokens;
+    } catch (err) {
+      // A dead token shouldn't stay in the browser to be retried forever.
+      if (err instanceof UnauthorizedException) this.refreshCookie.clear(res);
+      throw err;
+    }
   }
 
   @Post('logout')
@@ -87,12 +127,18 @@ export class AuthController {
   @ApiOperation({
     summary: 'Log out',
     description:
-      'Revokes the session the refresh token belongs to. Access tokens already issued stay valid until they expire. Unknown tokens are accepted, so this is always safe to retry.',
+      'Revokes the session the refresh token belongs to (from the body, or the `trek_refresh` cookie) and clears the cookie. Access tokens already issued stay valid until they expire. Unknown or missing tokens are accepted, so this is always safe to retry.',
   })
   @ApiNoContentResponse({ description: 'Session ended' })
   @ApiErrorResponses([HttpStatus.BAD_REQUEST])
-  async logout(@Body() dto: RefreshTokenDto) {
-    await this.authService.logout(dto.refreshToken);
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = dto?.refreshToken ?? this.refreshCookie.read(req);
+    if (token) await this.authService.logout(token);
+    this.refreshCookie.clear(res);
   }
 
   @Post('logout-all')
@@ -103,12 +149,16 @@ export class AuthController {
   @ApiOperation({
     summary: 'Log out everywhere',
     description:
-      "Revokes all of the current user's sessions. Access tokens already issued stay valid until they expire.",
+      "Revokes all of the current user's sessions and clears this browser's `trek_refresh` cookie. Access tokens already issued stay valid until they expire.",
   })
   @ApiNoContentResponse({ description: 'All sessions ended' })
   @ApiErrorResponses([HttpStatus.UNAUTHORIZED])
-  async logoutAll(@CurrentUser() user: ICurrentUser) {
+  async logoutAll(
+    @CurrentUser() user: ICurrentUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     await this.authService.logoutAll(user.id);
+    this.refreshCookie.clear(res);
   }
 
   // Not @Idempotent: the idempotency store would keep a hash of a body
@@ -128,15 +178,22 @@ export class AuthController {
     [HttpStatus.BAD_REQUEST]:
       'Current password is wrong (INVALID_CREDENTIALS), or invalid input (VALIDATION_FAILED)',
   })
-  changePassword(
+  async changePassword(
     @CurrentUser() user: ICurrentUser,
     @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.authService.changePassword(
+    const tokens = await this.authService.changePassword(
       user.id,
       dto.currentPassword,
       dto.newPassword,
     );
+    this.refreshCookie.set(
+      res,
+      tokens.refreshToken,
+      tokens.refreshTokenExpiresAt,
+    );
+    return tokens;
   }
 
   @Post('forgot-password')
