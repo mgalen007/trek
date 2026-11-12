@@ -4,7 +4,7 @@ All notable changes to Trek are recorded here. The format follows [Keep a Change
 
 One version covers the whole repository: the API and the agent in `agent/` are released together.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-12
 
 Getting the backend ready for a web app.
 
