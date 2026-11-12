@@ -52,6 +52,8 @@ curl -s -X POST http://127.0.0.1:8000/chat -H "Authorization: Bearer $AGENT" \
 # → {"conversation_id": "...", "reply": "..."}
 ```
 
+Or use the interactive docs at http://localhost:8000/docs: click **Authorize**, paste the agent token alone (Swagger UI adds `Bearer ` itself), then try `POST /chat`.
+
 Send the `conversation_id` back with the next message to continue the conversation. Agent tokens last 15 minutes: when `/chat` answers 401, get a new one (the conversation is kept).
 
 Errors come back as `{"error": {"code", "message"}}`, the same shape as the Trek API's:
